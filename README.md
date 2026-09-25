@@ -1,6 +1,6 @@
 # Open Prototypen CLI
 
-Open Prototypen is a local-first CLI for agent-led product exploration and editable OpenPencil prototypes. The agent owns research and product decisions; the CLI installs skills, supplies artifact contracts, validates structure, and compiles a navigable prototype from OpenPencil frames.
+Open Prototypen is a local-first CLI for agent-led product exploration and editable OpenPencil prototypes. The agent owns research and product decisions; the CLI installs skills, supplies artifact contracts, validates structure, and compiles a navigable prototype from OpenPencil frames. A dedicated component-review skill checks screen reuse and corrects detached copies before delivery.
 
 ## Install
 
@@ -20,7 +20,7 @@ open-prototypen --project /path/to/product instructions brief --json
 open-prototypen --project /path/to/product validate brief --json
 ```
 
-`init` creates `docs/design/config.yaml` and installs seven skills in `.agents/skills/` for Codex or `.claude/skills/` for Claude. Use `--harness all` for both. Give an agent the installed main skill path and the CLI command when its environment does not discover skills automatically. `update` refreshes unmodified installed skills while preserving local edits.
+`init` creates `docs/design/config.yaml` and installs eight skills in `.agents/skills/` for Codex or `.claude/skills/` for Claude. Use `--harness all` for both. Give an agent the installed main skill path and the CLI command when its environment does not discover skills automatically. `update` refreshes unmodified installed skills while preserving local edits.
 
 The agent writes project artifacts under `docs/design/` in the user's language. Structural keys and tool instructions stay in English. `status` reports readiness; `instructions` provides each artifact's contract and template; `validate` checks structure and dependencies. These commands and `inspect` support `--json`. See [workflow principles](docs/workflow.md).
 

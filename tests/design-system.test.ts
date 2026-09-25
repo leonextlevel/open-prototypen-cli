@@ -114,14 +114,25 @@ it('imports an SVG as editable vectors and preserves changed installed reference
     root,
     '.agents/skills/open-prototypen-design/references/visual-system.md',
   );
+  const review = join(
+    root,
+    '.agents/skills/open-prototypen-component-review/SKILL.md',
+  );
   writeFileSync(
     reference,
     readFileSync(reference, 'utf8') + '\nLocal observation.\n',
   );
-  expect(installSkills(root, 'codex', true).modified).toContain(
+  writeFileSync(
+    review,
+    readFileSync(review, 'utf8') + '\nLocal review note.\n',
+  );
+  const updated = installSkills(root, 'codex', true);
+  expect(updated.modified).toContain(
     'codex/open-prototypen-design/references/visual-system.md',
   );
+  expect(updated.modified).toContain('codex/open-prototypen-component-review');
   expect(readFileSync(reference, 'utf8')).toContain('Local observation.');
+  expect(readFileSync(review, 'utf8')).toContain('Local review note.');
 }, 20000);
 
 it('requires manifest components, bound tokens, and linked screen instances before compiling', async () => {
@@ -197,7 +208,9 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
     samples.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 }, opacity: 1 }];
     const swatch = figma.createRectangle(); swatch.name = 'color.surface'; swatch.resize(80, 80); samples.appendChild(swatch);
     const type = figma.createText(); type.name = 'Body type'; type.characters = 'Sample text'; type.y = 100; samples.appendChild(type);
-    const rhythm = figma.createRectangle(); rhythm.name = 'space.md'; rhythm.resize(12, 12); rhythm.y = 160; samples.appendChild(rhythm);
+    const rhythm = figma.createRectangle(); rhythm.name = 'space.md'; rhythm.resize(12, 12); rhythm.y = 160;
+    rhythm.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1, a: 1 }, opacity: 1 }];
+    samples.appendChild(rhythm);
     const color = figma.getLocalVariables().find((item) => item.name === 'color.surface');
     const spacing = figma.getLocalVariables().find((item) => item.name === 'space.md');
     const component = figma.createComponent(); component.name = 'BookRow/default'; component.resize(100, 40);

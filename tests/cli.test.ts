@@ -50,6 +50,16 @@ it('initializes both harnesses and serves artifact contracts through the CLI', (
   ).toBe(true);
   expect(
     existsSync(
+      join(root, '.agents/skills/open-prototypen-component-review/SKILL.md'),
+    ),
+  ).toBe(true);
+  expect(
+    existsSync(
+      join(root, '.claude/skills/open-prototypen-component-review/SKILL.md'),
+    ),
+  ).toBe(true);
+  expect(
+    existsSync(
       join(
         root,
         '.agents/skills/open-prototypen-design/references/visual-system.md',

@@ -8,6 +8,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 
 - Organize OpenPencil screens across flow pages while inspecting, rendering, and compiling frames from every page.
 - Guide agents to build a dedicated design-system page with component masters, states, and visual token samples.
+- Install a component-review skill that corrects detached screen elements and records justified one-off compositions.
 
 ## [0.1.0] - 2026-09-25
 

@@ -17,6 +17,7 @@ const skillNames = [
   'open-prototypen-research',
   'open-prototypen-define',
   'open-prototypen-design',
+  'open-prototypen-component-review',
   'open-prototypen-audit',
   'open-prototypen-refine',
 ];
