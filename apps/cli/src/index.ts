@@ -204,10 +204,11 @@ inspect
     ),
   );
 inspect
-  .command('screen <id>')
+  .command('screen <screen>')
+  .description('Resolve a screen key from interactions.yaml and its hotspots')
   .option('--json', 'Machine-readable JSON')
-  .action((id: string, options: { json?: boolean }) =>
-    output(inspectScreen(root(), id), options.json),
+  .action((screen: string, options: { json?: boolean }) =>
+    output(inspectScreen(root(), screen), options.json),
   );
 program
   .command('system')

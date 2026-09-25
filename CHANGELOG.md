@@ -16,6 +16,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 
 ### Fixed
 
+- `inspect screen` names its argument `<screen>`, the screen key from `interactions.yaml`, instead of `<id>`.
 - `render` no longer exports a node that is not a top-level page frame, and it keeps the previous PNG when an export fails its checks.
 - `render` fails when content outside a frame enlarges the PNG, and `prototype` rejects stale renders whose size differs from their frame.
 - Hotspots that extend outside their frame are rejected instead of compiled.

@@ -50,7 +50,7 @@ screens:
         action: back
 ```
 
-Use `inspect screen <id> --json` to confirm bounds and warnings.
+Use `inspect screen <screen> --json` to confirm bounds and warnings.
 
 Give screens a `title` and `content`, and actions a `label`, in the project's language. These are required. `content` should include all meaningful visible information because the PNG itself has empty alternative text. The runtime presents this content to screen readers while preserving the visual image.
 
