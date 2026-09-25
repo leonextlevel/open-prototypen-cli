@@ -1,0 +1,46 @@
+name: Improvement
+description: Propose a change to the CLI, skills, templates, runtime, or docs.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: The current behavior and why it matters. Link the relevant files and lines.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: The concrete change, with short generic examples.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Verifiable outcomes, including tests, docs and skill updates, and a changelog entry.
+      value: |
+        - [ ]
+        - [ ] Tests cover the new behavior.
+        - [ ] Docs and skills are updated where they describe this behavior.
+        - [ ] `CHANGELOG.md` has an entry under `[Unreleased]`.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and effort
+      description: Affected packages, skills, templates, and docs; rough effort (S/M/L); related issues.

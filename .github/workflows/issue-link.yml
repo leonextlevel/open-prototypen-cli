@@ -1,0 +1,23 @@
+name: Issue link
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  issue-link:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a linked issue in the pull request description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          pattern='(close[sd]?|fix(e[sd])?|resolve[sd]?|refs?)[[:space:]:]+(([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)?#[0-9]+|https://github\.com/[^[:space:]]+/issues/[0-9]+)'
+          if printf '%s' "$PR_BODY" | grep -Eiq "$pattern"; then
+            echo "Linked issue found."
+          else
+            echo "::error::Link an issue in the pull request description, for example 'Closes #42' or 'Refs #42'. See CONTRIBUTING.md."
+            exit 1
+          fi
