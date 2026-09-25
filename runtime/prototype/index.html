@@ -101,9 +101,13 @@
         accessible.append(heading, content);
         root.append(accessible);
 
-        for (const action of Object.values(config.actions)) {
-          if (action.when && state[action.when.key] !== action.when.value)
-            continue;
+        // Only the last active action on each node gets a hotspot, so pointer,
+        // keyboard, and assistive technology all reach the same action.
+        const effective = new Map();
+        for (const action of Object.values(config.actions))
+          if (!action.when || state[action.when.key] === action.when.value)
+            effective.set(action.slot, action);
+        for (const action of effective.values()) {
           const button = document.createElement('button');
           button.className = 'hotspot';
           button.type = 'button';

@@ -107,7 +107,12 @@ export function readInteractions(project: string): Interactions {
   return data;
 }
 export type PrototypeWarning = CanvasFinding;
-type RuntimeAction = z.infer<typeof actionSchema> & { bounds: Bounds };
+// Actions on the same resolved node share a `slot`, named after the first of them so it survives
+// ID renumbering. The runtime renders one hotspot per slot.
+type RuntimeAction = z.infer<typeof actionSchema> & {
+  bounds: Bounds;
+  slot: string;
+};
 type ResolvedScreen = {
   frame: DesignNode;
   bounds: Bounds;
@@ -154,7 +159,8 @@ function resolveScreen(
   const frame = resolveScreenFrame(index, name, entry);
   warnings.push(...legacyWarning(`Screen ${name}`, entry.frame));
   const actions: Record<string, RuntimeAction> = {};
-  const targets: { name: string; node: string; action: RuntimeAction }[] = [];
+  const targets: { name: string; action: RuntimeAction }[] = [];
+  const slots = new Map<string, string>();
   for (const [actionName, action] of Object.entries(entry.actions)) {
     const context = `Action ${name}.${actionName}`;
     warnings.push(...legacyWarning(context, action.node));
@@ -196,25 +202,27 @@ function resolveScreen(
       );
     if (unmeasured)
       warnings.push({ code: 'text-action', message: `${context}:${textHint}` });
-    const runtime = { ...action, bounds };
+    const slot = slots.get(target.node.id) ?? actionName;
+    slots.set(target.node.id, slot);
+    const runtime = { ...action, bounds, slot };
     actions[actionName] = runtime;
-    targets.push({ name: actionName, node: target.node.id, action: runtime });
+    targets.push({ name: actionName, action: runtime });
   }
   warnings.push(...coveredActionWarnings(name, targets));
   return { frame: frame.node, bounds: frame.bounds, actions };
 }
-// The runtime stacks hotspots in declaration order, so a later action on the same node wins.
+// The runtime renders only the last active action on each node, so a later action on the same node wins.
 // An earlier action is dead when that later one is active in every state where it is active.
 function coveredActionWarnings(
   screen: string,
-  targets: { name: string; node: string; action: RuntimeAction }[],
+  targets: { name: string; action: RuntimeAction }[],
 ): PrototypeWarning[] {
   return targets.flatMap((earlier, index) => {
     const cover = targets
       .slice(index + 1)
       .find(
         (later) =>
-          later.node === earlier.node &&
+          later.action.slot === earlier.action.slot &&
           (!later.action.when ||
             (later.action.when.key === earlier.action.when?.key &&
               later.action.when.value === earlier.action.when.value)),
