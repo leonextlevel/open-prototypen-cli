@@ -14,7 +14,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - Add `placement: bottom` to `open-overlay` for bottom sheets anchored to the current screen.
 - Accept `--json` on `system apply`, `svg import`, `ref`, `render`, and `prototype`.
 - Show agents how to simulate conflicts and deadlines with `set-state`, `when`, and action order in the installed design skill.
-- Document headless OpenPencil limits for agents: ID renumbering, unmeasured text, clipping, variable binding, fonts, and icon scaling.
+- Document headless OpenPencil limits for agents: ID renumbering, unmeasured text, clipping, variable binding, fonts, icon variants, which master changes reach instances, and how to export the `Design System` page.
 
 ### Fixed
 
