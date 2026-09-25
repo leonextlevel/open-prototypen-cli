@@ -190,6 +190,8 @@ it('rejects non-frame targets, oversized renders, and hotspots outside the frame
     frame.appendChild(label);
     const edge = figma.createText(); edge.name = 'edge'; edge.characters = 'Edge';
     frame.appendChild(edge); edge.x = 150;
+    const sized = figma.createText(); sized.name = 'sized'; sized.characters = 'Sized';
+    frame.appendChild(sized); sized.resize(120, 20); sized.x = 100; sized.y = 40;
     const other = figma.createFrame(); other.name = 'other'; other.resize(200, 100); other.x = 300;
   `,
     true,
@@ -202,6 +204,7 @@ it('rejects non-frame targets, oversized renders, and hotspots outside the frame
     { id: named(tree, 'inside').id, ref: 'inside' },
     { id: named(tree, 'label').id, ref: 'label' },
     { id: named(tree, 'edge').id, ref: 'edge' },
+    { id: named(tree, 'sized').id, ref: 'sized' },
   ]);
   const write = (frame: string, action: string) =>
     interactions(
@@ -238,7 +241,11 @@ it('rejects non-frame targets, oversized renders, and hotspots outside the frame
   ]);
   write('screen', 'edge');
   expect(() => inspectScreen(root, 'screen')).toThrow(
-    'extends outside frame screen',
+    'still has the 100×100 default size',
+  );
+  write('screen', 'sized');
+  expect(() => inspectScreen(root, 'screen')).toThrow(
+    /extends outside frame screen \(200×100\)\.$/,
   );
 
   write('screen', 'inside');

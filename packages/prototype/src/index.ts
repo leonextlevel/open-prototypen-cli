@@ -166,9 +166,13 @@ function resolveScreen(
       width: target.bounds.width,
       height: target.bounds.height,
     };
-    const text = target.node.type === 'TEXT';
-    const textHint = text
-      ? ' Headless OpenPencil does not measure text and reports 100×100 bounds; use a sized container or a transparent hit area as the action node.'
+    // Headless OpenPencil leaves unmeasured text at its 100×100 default; an explicit size is trusted.
+    const unmeasured =
+      target.node.type === 'TEXT' &&
+      target.node.width === 100 &&
+      target.node.height === 100;
+    const textHint = unmeasured
+      ? ' This text node still has the 100×100 default size because headless OpenPencil does not measure text; size it explicitly or use a sized container or a transparent hit area as the action node.'
       : '';
     if (bounds.width <= 0 || bounds.height <= 0)
       throw new Error(
@@ -184,7 +188,7 @@ function resolveScreen(
       throw new Error(
         `${context}: hotspot ${bounds.width}×${bounds.height} at ${bounds.x},${bounds.y} extends outside frame ${frame.node.name} (${frame.bounds.width}×${frame.bounds.height}).${textHint}`,
       );
-    if (text)
+    if (unmeasured)
       warnings.push({ code: 'text-action', message: `${context}:${textHint}` });
     actions[actionName] = { ...action, bounds };
   }
