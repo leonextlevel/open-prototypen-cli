@@ -12,6 +12,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - Add `ref set`, `ref clear`, and `ref list` to give frames and action nodes stable references that survive OpenPencil's ID renumbering; `interactions.yaml` accepts these references and a `part` for a layer inside an instance.
 - Warn about actions that can never be clicked because a later action on the same node covers them, about screens unreachable from the initial screen, text action nodes, legacy numeric node IDs, and component masters outside the `Design System` page.
 - Accept `--json` on `system apply`, `svg import`, `ref`, `render`, and `prototype`.
+- Show agents how to simulate conflicts and deadlines with `set-state`, `when`, and action order in the installed design skill.
 - Document headless OpenPencil limits for agents: ID renumbering, unmeasured text, clipping, variable binding, fonts, and icon scaling.
 
 ### Fixed
