@@ -149,6 +149,7 @@ function resolveScreen(
   const frame = resolveScreenFrame(index, name, entry);
   warnings.push(...legacyWarning(`Screen ${name}`, entry.frame));
   const actions: Record<string, RuntimeAction> = {};
+  const targets: { name: string; node: string; action: RuntimeAction }[] = [];
   for (const [actionName, action] of Object.entries(entry.actions)) {
     const context = `Action ${name}.${actionName}`;
     warnings.push(...legacyWarning(context, action.node));
@@ -190,9 +191,38 @@ function resolveScreen(
       );
     if (unmeasured)
       warnings.push({ code: 'text-action', message: `${context}:${textHint}` });
-    actions[actionName] = { ...action, bounds };
+    const runtime = { ...action, bounds };
+    actions[actionName] = runtime;
+    targets.push({ name: actionName, node: target.node.id, action: runtime });
   }
+  warnings.push(...coveredActionWarnings(name, targets));
   return { frame: frame.node, bounds: frame.bounds, actions };
+}
+// The runtime stacks hotspots in declaration order, so a later action on the same node wins.
+// An earlier action is dead when that later one is active in every state where it is active.
+function coveredActionWarnings(
+  screen: string,
+  targets: { name: string; node: string; action: RuntimeAction }[],
+): PrototypeWarning[] {
+  return targets.flatMap((earlier, index) => {
+    const cover = targets
+      .slice(index + 1)
+      .find(
+        (later) =>
+          later.node === earlier.node &&
+          (!later.action.when ||
+            (later.action.when.key === earlier.action.when?.key &&
+              later.action.when.value === earlier.action.when.value)),
+      );
+    return cover
+      ? [
+          {
+            code: 'covered-action',
+            message: `Action ${screen}.${earlier.name} can never be clicked: ${screen}.${cover.name}, declared later on the same node, is active whenever it is. Give actions that share a node when conditions on the same key with different values.`,
+          },
+        ]
+      : [];
+  });
 }
 function reachabilityWarnings(interactions: Interactions): PrototypeWarning[] {
   const reached = new Set([interactions.initialScreen]);

@@ -248,6 +248,39 @@ it('rejects non-frame targets, oversized renders, and hotspots outside the frame
     /extends outside frame screen \(200×100\)\.$/,
   );
 
+  interactions(
+    root,
+    `version: 1
+initialScreen: screen
+screens:
+  screen:
+    frame: screen
+    title: Screen
+    content: Content.
+    actions:
+      default:
+        node: inside
+        label: Default
+        action: navigate
+        target: screen
+      conflict:
+        node: inside
+        label: Conflict
+        when: { key: attempt, value: first }
+        action: navigate
+        target: screen
+      override:
+        node: inside
+        label: Override
+        action: back
+`,
+  );
+  expect(
+    inspectScreen(root, 'screen').warnings.map((warning) => warning.message),
+  ).toEqual([
+    expect.stringContaining('screen.default can never be clicked'),
+    expect.stringContaining('screen.conflict can never be clicked'),
+  ]);
   write('screen', 'inside');
   renderScreens(root);
   const compiled = compilePrototype(root);
