@@ -1,4 +1,4 @@
-name: Publish npm package
+name: Verify and stage npm package
 
 on:
   release:
@@ -22,6 +22,8 @@ jobs:
           node-version: '24'
           registry-url: https://registry.npmjs.org
           cache: pnpm
+      - name: Install npm with staged publishing support
+        run: npm install --global npm@11.20.0
       - name: Check release metadata
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
@@ -32,7 +34,11 @@ jobs:
       - run: pnpm format:check
       - run: pnpm test
       - run: npm pack --dry-run
-      - name: Publish to npm
-        run: npm publish --access public --provenance
+      - name: Verify manually published first version
+        if: github.event.release.tag_name == 'v0.1.0'
+        run: test "$(npm view open-prototypen-cli@0.1.0 version)" = '0.1.0'
+      - name: Stage next version for maintainer approval
+        if: github.event.release.tag_name != 'v0.1.0'
+        run: npm stage publish . --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

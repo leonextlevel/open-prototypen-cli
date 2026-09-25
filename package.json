@@ -31,7 +31,7 @@
   ],
   "type": "module",
   "bin": {
-    "open-prototypen": "./bin/open-prototypen.mjs"
+    "open-prototypen": "bin/open-prototypen.mjs"
   },
   "packageManager": "pnpm@9.15.0",
   "scripts": {

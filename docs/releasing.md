@@ -4,14 +4,25 @@ The npm package is `open-prototypen-cli`; its executable remains `open-prototype
 
 ## First release: v0.1.0
 
-The initial commit and annotated `v0.1.0` tag are created locally on `main`. Publishing the tag alone does not publish npm. Create the public GitHub repository `leonextlevel/open-prototypen-cli`, push `main` and `v0.1.0`, then publish a GitHub Release using the existing tag when ready. The workflow checks the tag, root package version, and dated changelog section before publishing.
+The annotated `v0.1.0` tag is local on `main`. Publishing the tag alone does not publish npm. Create the public GitHub repository `leonextlevel/open-prototypen-cli` and push `main` and `v0.1.0` when ready. The workflow checks the tag, root package version, and dated changelog section.
 
-Before publishing the GitHub Release, confirm the npm package name is still available. Create an npm granular access token with package read/write (publish and stage) and bypass 2FA enabled, restricted to the minimum practical scope and lifetime. Add it as the GitHub Actions secret `NPM_TOKEN`. The first package version cannot use npm trusted publishing: [npm requires an existing package before trust can be configured](https://docs.npmjs.com/cli/v11/commands/npm-trust/). A granular token supports the first non-interactive publish from Actions; [direct token publishing is being deprecated](https://docs.npmjs.com/about-access-tokens/), so remove it after bootstrapping.
+Before creating the GitHub Release, confirm the npm package name is still available. Publish `0.1.0` interactively from the exact `v0.1.0` checkout using an npm account with 2FA:
 
-The published GitHub Release triggers `.github/workflows/publish.yml`. Watch its checks and confirm `npm view open-prototypen-cli@0.1.0 version` and a clean global install afterward. If a release job fails, fix the cause and rerun the job; do not move or reuse a published version tag for different code.
+```sh
+git switch --detach v0.1.0
+pnpm install --frozen-lockfile
+pnpm typecheck && pnpm lint && pnpm format:check && pnpm test
+npm login
+npm publish --access public
+git switch main
+```
+
+The first package version cannot use staged publishing or npm trusted publishing: [both require the package to exist on the registry](https://docs.npmjs.com/staged-publishing/). Create the GitHub Release from `v0.1.0` after the npm publish succeeds. The workflow verifies that `0.1.0` is live; it does not attempt to stage or publish that version again. Confirm `npm view open-prototypen-cli@0.1.0 version` and a clean global install. Do not move or reuse a tag after it has been pushed or published.
 
 ## Subsequent releases
 
-Record notable changes under `[Unreleased]` in `CHANGELOG.md` while developing on topic branches. Wait for the maintainer's explicit completion signal before choosing a version. At that point, close the changelog section with a date, update the root version and lockfile, run checks and a packed-install smoke test, merge to `main`, and create an annotated `vX.Y.Z` tag. Publish a GitHub Release from that tag to run the workflow.
+Record notable changes under `[Unreleased]` in `CHANGELOG.md` while developing on topic branches. Wait for the maintainer's explicit completion signal before choosing a version. At that point, close the changelog section with a date, update the root version and lockfile, run checks and a packed-install smoke test, merge to `main`, and create an annotated `vX.Y.Z` tag.
 
-After `0.1.0` exists on npm, configure `leonextlevel/open-prototypen-cli` and workflow filename `publish.yml` as an [npm trusted publisher](https://docs.npmjs.com/trusted-publishers/), allowing direct publish. Remove `NODE_AUTH_TOKEN` from the publish step and delete the `NPM_TOKEN` GitHub secret. The workflow already grants `id-token: write` for OIDC and provenance. Verify the first OIDC release before considering the migration complete.
+For a later version, create a granular npm token with **Read and write (stage only)** access to this package, without bypass 2FA. Save it as the GitHub Actions secret `NPM_TOKEN`. Publish a GitHub Release from the version tag. The workflow uses npm 11.20.0 (the local npm 11.9.0 does not support `stage`) and runs `npm stage publish . --access public --provenance`; a successful job means the version is staged, **not yet public**. Review it with `npm stage list open-prototypen-cli`, `npm stage view <stage-id>`, and optionally `npm stage download <stage-id>`. Approve it with 2FA using `npm stage approve <stage-id>` or the npm website, then verify the live version. Staged publishing requires npm 11.15.0 or newer and Node 22.14.0 or newer. If staging fails, fix the cause and rerun the job; if the stage itself is wrong, reject it before retrying the same version.
+
+Once `0.1.0` exists, you may replace the token with an [npm trusted publisher](https://docs.npmjs.com/trusted-publishers/) for `leonextlevel/open-prototypen-cli` and workflow `publish.yml`. Grant **stage-only** permission, remove `NODE_AUTH_TOKEN` from the workflow and delete `NPM_TOKEN`. Keep the approval step; the workflow already grants `id-token: write` for OIDC and provenance.
