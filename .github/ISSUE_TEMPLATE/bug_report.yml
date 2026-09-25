@@ -1,0 +1,47 @@
+name: Bug report
+description: A command, validation, render, or prototype behaves incorrectly.
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One or two sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: The current behavior, who is affected, and what goes wrong. Link the relevant files and lines.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal commands and inputs from an isolated example project, with the actual and the expected result. Use generic data.
+      placeholder: |
+        1. `open-prototypen init`
+        2. Add to `docs/design/prototype/interactions.yaml`:
+           ```yaml
+           ...
+           ```
+        3. Run `open-prototypen prototype`
+
+        Actual: ...
+        Expected: ...
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Optional. CLI flags and output, validation codes, schema fields, or skill and template text.
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Output of `open-prototypen --version`, Node.js version, and operating system.
+    validations:
+      required: true
