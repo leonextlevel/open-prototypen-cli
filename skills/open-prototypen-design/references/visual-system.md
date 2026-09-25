@@ -15,7 +15,7 @@ Use this reference when moving from visual research to an editable OpenPencil de
 - Define a spacing rhythm and alignment rules. Pick values for relationships (inside a control, between related content, between sections), then use them consistently. Use OpenPencil layout features when they improve editability; avoid relying on absolute placement for repeated content.
 - Record the machine-readable values and reusable component inventory in `docs/design/design/system.yaml`; use `docs/design/design/system.md` to explain why these choices serve the product. Apply the variables to the `.fig` and bind repeated semantic values in component masters and shared screen structures, rather than binding each token once while leaving matching copies hardcoded. A prose list of colors or components does not establish a native design system.
 
-The v1 contract uses OpenPencil variable types. Quote hex values in YAML so `#` does not start a comment. A component's `screens` values are the screen keys later used in `interactions.yaml`:
+The v1 contract uses OpenPencil variable types. Quote hex values in YAML so `#` does not start a comment. A component's `screens` values are the screen keys later used in `interactions.yaml`; a screen counts when the component appears there directly or inside an instance of another component:
 
 ```yaml
 version: 1

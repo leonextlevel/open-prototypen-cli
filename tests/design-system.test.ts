@@ -195,6 +195,43 @@ it('requires manifest components, bound tokens, and linked screen instances befo
   );
 }, 20000);
 
+it('counts components nested inside other component instances as screen usage', async () => {
+  const root = fixture();
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'components:',
+      'components:\n  - name: Badge\n    states: [active]\n    screens: [collection]',
+    ),
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const color = figma.getLocalVariables().find((item) => item.name === 'color.surface');
+    const spacing = figma.getLocalVariables().find((item) => item.name === 'space.md');
+    const badge = figma.createComponent(); badge.name = 'Badge/active'; badge.resize(40, 20);
+    const row = figma.createComponent(); row.name = 'BookRow/default'; row.resize(300, 80);
+    row.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1, a: 1 }, opacity: 1 }];
+    row.layoutMode = 'VERTICAL'; row.itemSpacing = 12;
+    figma.bindVariable(row.id, 'fills/0/color', color.id);
+    figma.bindVariable(row.id, 'itemSpacing', spacing.id);
+    row.appendChild(badge.createInstance());
+    const selected = figma.createComponent(); selected.name = 'BookRow/selected'; selected.resize(300, 80);
+    const frame = figma.createFrame(); frame.name = 'collection'; frame.resize(390, 760);
+    frame.appendChild(row.createInstance());
+  `,
+    true,
+  );
+  const frame = inspectCanvas(root).tree.find(
+    (node) => node.name === 'collection',
+  );
+  expect(validateCanvas(root, { collection: frame?.id ?? '' })).toMatchObject({
+    valid: true,
+    findings: [],
+  });
+}, 20000);
+
 it('inspects, renders, and compiles screens across flow pages', async () => {
   const root = fixture();
   await applyDesignSystem(root);

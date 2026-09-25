@@ -42,6 +42,26 @@ function descendsFrom(
   return false;
 }
 
+// An instance nested in another master's instance links to the matching layer of that master,
+// which is itself an instance; follow the chain to the component it ultimately uses.
+function linkedMaster(
+  node: NativeNode,
+  nodes: Map<string, NativeNode>,
+): string | undefined {
+  const seen = new Set<string>();
+  for (
+    let id: string | null | undefined = node.componentId;
+    id && !seen.has(id);
+    id = nodes.get(id)?.componentId
+  ) {
+    const target = nodes.get(id);
+    if (target?.type === 'COMPONENT') return id;
+    if (target?.type !== 'INSTANCE') return undefined;
+    seen.add(id);
+  }
+  return undefined;
+}
+
 export const DESIGN_SYSTEM_PAGE = 'Design System';
 // OpenPencil keeps internal masters on this hidden page; they are not project work.
 const INTERNAL_PAGE = 'Internal Only Canvas';
@@ -204,12 +224,14 @@ export function validateCanvas(
         continue;
       }
       if (
-        !instances.some(
-          (node) =>
-            node.componentId &&
-            stateIds.has(node.componentId) &&
-            descendsFrom(node, frameId, nodes),
-        )
+        !instances.some((node) => {
+          const master = linkedMaster(node, nodes);
+          return (
+            master !== undefined &&
+            stateIds.has(master) &&
+            descendsFrom(node, frameId, nodes)
+          );
+        })
       )
         findings.push({
           code: 'component-instance',
