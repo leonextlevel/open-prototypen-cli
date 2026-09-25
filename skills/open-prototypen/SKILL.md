@@ -2,7 +2,7 @@
 name: open-prototypen
 description: Guide an agent through product exploration and OpenPencil prototyping in a repository initialized with Open Prototypen.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Open Prototypen

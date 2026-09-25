@@ -2,7 +2,7 @@
 name: open-prototypen-explore
 description: Explore an early product idea, clarify assumptions, and decide when a brief is useful.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Explore

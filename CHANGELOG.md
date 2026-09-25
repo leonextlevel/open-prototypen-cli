@@ -4,6 +4,8 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-25
+
 ### Added
 
 - Organize OpenPencil screens across flow pages while inspecting, rendering, and compiling frames from every page.
@@ -37,5 +39,6 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - Native design-system token synchronization, component and instance validation, and editable SVG import.
 - npm packaging, MIT license, and release automation for the first public version.
 
-[Unreleased]: https://github.com/leonextlevel/open-prototypen-cli/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/leonextlevel/open-prototypen-cli/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/leonextlevel/open-prototypen-cli/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/leonextlevel/open-prototypen-cli/releases/tag/v0.1.0

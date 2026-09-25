@@ -2,7 +2,7 @@
 name: open-prototypen-component-review
 description: Review OpenPencil prototype screens for reuse of native design-system components, correct detached copies, and document justified one-off compositions.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Component review

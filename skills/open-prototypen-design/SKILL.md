@@ -2,7 +2,7 @@
 name: open-prototypen-design
 description: Derive design direction and system, then build and inspect editable OpenPencil screens.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Design

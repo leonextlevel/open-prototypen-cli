@@ -2,7 +2,7 @@
 name: open-prototypen-audit
 description: Independently review a rendered prototype against product and design artifacts.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Audit

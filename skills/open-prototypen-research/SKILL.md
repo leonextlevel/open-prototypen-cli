@@ -2,7 +2,7 @@
 name: open-prototypen-research
 description: Research market, competitors, UX patterns, and visual references for a product concept.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Research

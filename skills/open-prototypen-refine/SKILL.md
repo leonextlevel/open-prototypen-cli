@@ -2,7 +2,7 @@
 name: open-prototypen-refine
 description: Resolve audit findings in design artifacts and OpenPencil screens without erasing decisions.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Refine

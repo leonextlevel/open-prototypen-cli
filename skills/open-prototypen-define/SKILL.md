@@ -2,7 +2,7 @@
 name: open-prototypen-define
 description: Turn an explored idea and evidence into product definition, flows, and screen map artifacts.
 metadata:
-  open-prototypen-version: 0.1.0
+  open-prototypen-version: 0.2.0
 ---
 
 # Define
