@@ -6,6 +6,7 @@ import {
   artifactPath,
   dependencyPaths,
   projectSummary,
+  resolveProjectLanguage,
 } from '../../../packages/core/src/index.js';
 import { readDesignSystem } from '../../../packages/core/src/system.js';
 import {
@@ -19,10 +20,16 @@ import {
   inspectNativeSystem,
 } from '../../../packages/openpencil/src/system.js';
 import {
+  clearRefs,
+  listRefs,
+  parseAssignment,
+  setRefs,
+} from '../../../packages/openpencil/src/refs.js';
+import {
   compilePrototype,
   inspectScreen,
-  readInteractions,
   renderScreens,
+  validatePrototypeCanvas,
 } from '../../../packages/prototype/src/index.js';
 import {
   getDefinition,
@@ -34,7 +41,6 @@ import {
   status,
   validateArtifact,
 } from '../../../packages/validator/src/index.js';
-import { validateCanvas } from '../../../packages/validator/src/canvas.js';
 
 const program = new Command();
 program
@@ -60,6 +66,17 @@ const output = (value: unknown, json?: boolean) =>
         ? value
         : JSON.stringify(value, null, 2),
   );
+
+// Templates ship with an English placeholder; artifacts should declare the project's language.
+const localizedTemplate = (template: string) => {
+  let language: string;
+  try {
+    language = resolveProjectLanguage(root());
+  } catch {
+    return template;
+  }
+  return template.replace(/^language: en$/m, `language: ${language}`);
+};
 
 program
   .command('init')
@@ -111,7 +128,7 @@ program
       optional: definition.optional,
       instructions: definition.instructions,
       rules: definition.rules,
-      template: templateFor(id),
+      template: localizedTemplate(templateFor(id)),
     };
     output(contract, options.json);
   });
@@ -121,30 +138,15 @@ program
   .option('--json', 'Machine-readable JSON')
   .action((id: string | undefined, options: { json?: boolean }) => {
     if (id === 'canvas') {
-      let frames: Record<string, string> = {};
-      let interactionError: string | undefined;
-      try {
-        frames = Object.fromEntries(
-          Object.entries(readInteractions(root()).screens).map(
-            ([name, screen]) => [name, screen.frame],
-          ),
-        );
-      } catch (error) {
-        interactionError =
-          error instanceof Error ? error.message : String(error);
-      }
-      const result = validateCanvas(root(), frames);
-      if (interactionError) {
-        result.findings.push({
-          code: 'interactions',
-          message: interactionError,
-        });
-        result.valid = false;
-      }
+      const result = validatePrototypeCanvas(root());
+      const notes = [
+        ...result.findings.map((finding) => finding.message),
+        ...result.warnings.map((warning) => `warning: ${warning.message}`),
+      ];
       output(
         options.json
           ? result
-          : `${result.valid ? '✓' : '✗'} canvas${result.findings.length ? `: ${result.findings.map((finding) => finding.message).join('; ')}` : ''}`,
+          : `${result.valid ? '✓' : '✗'} canvas${notes.length ? `: ${notes.join('; ')}` : ''}`,
         options.json,
       );
       if (!result.valid) process.exitCode = 1;
@@ -211,23 +213,59 @@ program
   .command('system')
   .description('Manage the native OpenPencil design system')
   .command('apply')
-  .action(async () => output(await applyDesignSystem(root())));
+  .option('--json', 'Machine-readable JSON')
+  .action(async (options: { json?: boolean }) =>
+    output(await applyDesignSystem(root()), options.json),
+  );
 program
   .command('svg')
   .description('Manage editable SVG assets in OpenPencil')
   .command('import <file>')
   .option('--name <name>', 'Name of the imported vector group')
-  .action((file: string, options: { name?: string }) =>
-    output(importSvg(root(), file, options.name)),
+  .option('--json', 'Machine-readable JSON')
+  .action((file: string, options: { name?: string; json?: boolean }) =>
+    output(importSvg(root(), file, options.name), options.json),
   );
+const ref = program
+  .command('ref')
+  .description('Manage stable node references used by interactions.yaml');
+ref
+  .command('set <assignments...>')
+  .description('Assign references as <node-id>=<ref> pairs')
+  .option('--json', 'Machine-readable JSON')
+  .action((assignments: string[], options: { json?: boolean }) =>
+    output(setRefs(root(), assignments.map(parseAssignment)), options.json),
+  );
+ref
+  .command('clear <node-ids...>')
+  .description('Remove references from nodes')
+  .option('--json', 'Machine-readable JSON')
+  .action((ids: string[], options: { json?: boolean }) =>
+    output(clearRefs(root(), ids), options.json),
+  );
+ref
+  .command('list')
+  .description('List references and duplicate or misplaced ones')
+  .option('--json', 'Machine-readable JSON')
+  .action((options: { json?: boolean }) => {
+    const result = listRefs(root());
+    output(result, options.json);
+    if (result.problems.length) process.exitCode = 1;
+  });
 program
   .command('render [screen]')
   .description('Export OpenPencil frames to PNG')
-  .action((screen?: string) => output(renderScreens(root(), screen)));
+  .option('--json', 'Machine-readable JSON')
+  .action((screen: string | undefined, options: { json?: boolean }) =>
+    output(renderScreens(root(), screen), options.json),
+  );
 program
   .command('prototype')
   .description('Compile rendered screens into a navigable HTML prototype')
-  .action(() => output(compilePrototype(root())));
+  .option('--json', 'Machine-readable JSON')
+  .action((options: { json?: boolean }) =>
+    output(compilePrototype(root()), options.json),
+  );
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   console.error(

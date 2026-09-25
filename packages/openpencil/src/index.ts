@@ -1,7 +1,13 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { workspace } from '../../core/src/index.js';
 
 export type DesignNode = {
@@ -12,9 +18,15 @@ export type DesignNode = {
   y: number;
   width: number;
   height: number;
+  ref?: string;
+  page?: string;
   children?: DesignNode[];
 };
 export type Bounds = { x: number; y: number; width: number; height: number };
+export type Size = { width: number; height: number };
+// Shared plugin data survives saves, unlike node IDs, which OpenPencil renumbers in document order.
+export const REF_NAMESPACE = 'open-prototypen';
+export const REF_KEY = 'ref';
 export function figPath(project: string): string {
   return join(workspace(project), 'prototype/prototype.fig');
 }
@@ -63,12 +75,15 @@ export function inspectCanvas(project: string): {
         x: Math.round(node.x), y: Math.round(node.y),
         width: Math.round(node.width), height: Math.round(node.height)
       };
+      const ref = figma.getNodeById(id)?.getSharedPluginData(${JSON.stringify(REF_NAMESPACE)}, ${JSON.stringify(REF_KEY)});
+      if (ref) result.ref = ref;
       if (node.childIds.length) {
         result.children = node.childIds.map(visit).filter(Boolean);
       }
       return result;
     };
-    return graph.getPages().flatMap((page) => page.childIds.map(visit).filter(Boolean));`,
+    return graph.getPages().flatMap((page) =>
+      page.childIds.map(visit).filter(Boolean).map((node) => ({ ...node, page: page.name })));`,
   ) as DesignNode[];
   return {
     document: file,
@@ -125,17 +140,48 @@ export function relativeBounds(
     throw new Error(`Action node ${actionId} has empty bounds`);
   return bounds;
 }
+export function pngSize(file: string): Size {
+  const data = readFileSync(file);
+  if (data.length < 24 || data.toString('ascii', 12, 16) !== 'IHDR')
+    throw new Error(`Not a PNG image: ${file}`);
+  return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+}
+export function sameSize(actual: Size, expected: Size): boolean {
+  // Fractional frame sizes may round either way in the exported PNG.
+  return (
+    Math.abs(actual.width - expected.width) <= 1 &&
+    Math.abs(actual.height - expected.height) <= 1
+  );
+}
 export function renderFrame(
   project: string,
   frameId: string,
   output: string,
+  expected?: Size,
 ): string {
   const file = figPath(project);
   if (!existsSync(file))
     throw new Error(`OpenPencil document does not exist: ${file}`);
-  mkdirSync(join(output, '..'), { recursive: true });
-  run(['export', file, '-f', 'png', '--node', frameId, '-o', output]);
-  if (!existsSync(output))
-    throw new Error(`OpenPencil did not produce ${output}`);
+  mkdirSync(dirname(output), { recursive: true });
+  // Export beside the target so a failed check never replaces a good render.
+  const temporary = join(
+    dirname(output),
+    `.${basename(output, '.png')}.${process.pid}.tmp.png`,
+  );
+  try {
+    run(['export', file, '-f', 'png', '--node', frameId, '-o', temporary]);
+    if (!existsSync(temporary))
+      throw new Error(`OpenPencil did not produce ${output}`);
+    if (expected) {
+      const actual = pngSize(temporary);
+      if (!sameSize(actual, expected))
+        throw new Error(
+          `Render of frame ${frameId} is ${actual.width}×${actual.height} but the frame is ${expected.width}×${expected.height}; content outside the frame is being exported. Enable clipsContent on the frame or keep its content inside the frame bounds.`,
+        );
+    }
+    renameSync(temporary, output);
+  } finally {
+    rmSync(temporary, { force: true });
+  }
   return output;
 }

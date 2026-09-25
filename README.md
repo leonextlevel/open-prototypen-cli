@@ -34,11 +34,12 @@ open-prototypen --project /path/to/product svg import /path/to/icon.svg --name s
 open-prototypen --project /path/to/product inspect system --json
 open-prototypen --project /path/to/product validate canvas --json
 open-prototypen --project /path/to/product inspect canvas --json
+open-prototypen --project /path/to/product ref set 0:12=collection 0:15=open-detail
 open-prototypen --project /path/to/product render
 open-prototypen --project /path/to/product prototype
 ```
 
-`system apply` creates the `.fig` when needed and synchronizes its native variables. The agent builds a `Design System` page with every component master and state plus visual samples of colors, typography, and spacing, then organizes screen frames by flow on other pages. The CLI uses the pinned `@open-pencil/cli@0.15.1` for inspection and export. Define frames and node-based actions in `docs/design/prototype/interactions.yaml` as shown in [prototype interactions](docs/interactions.md). `render` exports PNGs to `docs/design/prototype/renders/`; `prototype` writes a local site to `docs/design/prototype/dist/` that can be opened at `index.html`.
+`system apply` creates the `.fig` when needed and synchronizes its native variables. The agent builds a `Design System` page with every component master and state plus visual samples of colors, typography, and spacing, then organizes screen frames by flow on other pages. The CLI uses the pinned `@open-pencil/cli@0.15.1` for inspection and export. OpenPencil renumbers node IDs whenever nodes are added or removed, so `ref set` stores stable references in screen frames and action nodes; `interactions.yaml` uses them to define frames and node-based actions, as shown in [prototype interactions](docs/interactions.md). `render` and `prototype` reject duplicate references, targets that are not top-level frames, renders whose size differs from their frame, and hotspots outside their frame, and they warn about unreachable screens. `render` exports PNGs to `docs/design/prototype/renders/`; `prototype` writes a local site to `docs/design/prototype/dist/` that can be opened at `index.html`.
 
 ## Develop and release
 

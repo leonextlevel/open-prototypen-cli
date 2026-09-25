@@ -169,6 +169,9 @@ it('requires manifest components, bound tokens, and linked screen instances befo
     valid: true,
     summary: { tokens: 2, boundTokens: 2, components: 2, instances: 1 },
   });
+  expect(validation.warnings).toEqual([
+    expect.objectContaining({ code: 'design-system-page' }),
+  ]);
   writeFileSync(
     join(root, 'docs/design/prototype/interactions.yaml'),
     `version: 1\ninitialScreen: collection\nscreens:\n  collection:\n    frame: '${frame.id}'\n    title: Coleção\n    content: Uma coleção de livros.\n    actions: {}\n`,
@@ -269,7 +272,10 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
   expect(relativeBounds(canvas.tree, ids.collection, ids.action)).toMatchObject(
     { x: 30, y: 90 },
   );
-  expect(validateCanvas(root, { collection: ids.collection }).valid).toBe(true);
+  expect(validateCanvas(root, { collection: ids.collection })).toMatchObject({
+    valid: true,
+    warnings: [],
+  });
   const native = inspectNativeSystem(root);
   const component = native.nodes.find(
     (node) => node.type === 'COMPONENT' && node.name === 'BookRow/default',

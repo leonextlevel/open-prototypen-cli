@@ -17,6 +17,8 @@ export type CanvasValidation = {
   artifact: 'canvas';
   valid: boolean;
   findings: CanvasFinding[];
+  // Warnings describe likely drift but do not block compilation.
+  warnings: CanvasFinding[];
   summary: {
     tokens: number;
     boundTokens: number;
@@ -40,6 +42,53 @@ function descendsFrom(
   return false;
 }
 
+export const DESIGN_SYSTEM_PAGE = 'Design System';
+// OpenPencil keeps internal masters on this hidden page; they are not project work.
+const INTERNAL_PAGE = 'Internal Only Canvas';
+
+function pageOf(
+  node: NativeNode,
+  nodes: Map<string, NativeNode>,
+): NativeNode | undefined {
+  const seen = new Set<string>();
+  for (
+    let current: NativeNode | undefined = node;
+    current && !seen.has(current.id);
+    current = current.parentId ? nodes.get(current.parentId) : undefined
+  ) {
+    if (current.type === 'CANVAS') return current;
+    seen.add(current.id);
+  }
+  return undefined;
+}
+
+function masterPageWarnings(
+  components: NativeNode[],
+  nodes: Map<string, NativeNode>,
+): CanvasFinding[] {
+  const masters = components
+    .map((node) => ({ node, page: pageOf(node, nodes) }))
+    .filter(({ page }) => page?.name !== INTERNAL_PAGE);
+  if (!masters.length) return [];
+  if (
+    ![...nodes.values()].some(
+      (node) => node.type === 'CANVAS' && node.name === DESIGN_SYSTEM_PAGE,
+    )
+  )
+    return [
+      {
+        code: 'design-system-page',
+        message: `No page named ${DESIGN_SYSTEM_PAGE}; place component masters and token samples there`,
+      },
+    ];
+  return masters
+    .filter(({ page }) => page?.name !== DESIGN_SYSTEM_PAGE)
+    .map(({ node, page }) => ({
+      code: 'component-page',
+      message: `Component master ${node.name} is on page ${page?.name ?? 'unknown'} instead of ${DESIGN_SYSTEM_PAGE}`,
+    }));
+}
+
 export function validateCanvas(
   project: string,
   screenFrames: Record<string, string>,
@@ -54,6 +103,7 @@ export function validateCanvas(
     return {
       artifact: 'canvas',
       valid: false,
+      warnings: [],
       findings: [
         {
           code: 'system-manifest',
@@ -70,6 +120,7 @@ export function validateCanvas(
     return {
       artifact: 'canvas',
       valid: false,
+      warnings: [],
       findings: [
         { code: 'fig', message: `${figPath(project)}: ${String(error)}` },
       ],
@@ -181,6 +232,7 @@ export function validateCanvas(
     artifact: 'canvas',
     valid: findings.length === 0,
     findings,
+    warnings: masterPageWarnings(components, nodes),
     summary,
   };
 }

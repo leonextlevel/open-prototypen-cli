@@ -15,18 +15,34 @@ import {
 } from '../../core/src/index.js';
 import { packageRoot } from '../../schemas/src/index.js';
 import {
-  findNode,
   inspectCanvas,
-  relativeBounds,
+  pngSize,
   renderFrame,
+  sameSize,
   type Bounds,
+  type DesignNode,
 } from '../../openpencil/src/index.js';
-import { validateCanvas } from '../../validator/src/canvas.js';
+import {
+  describeNode,
+  indexRefs,
+  isNodeId,
+  resolveFrame,
+  resolveNode,
+  resolvePart,
+  type PlacedNode,
+  type RefIndex,
+} from '../../openpencil/src/refs.js';
+import {
+  validateCanvas,
+  type CanvasFinding,
+  type CanvasValidation,
+} from '../../validator/src/canvas.js';
 
 const id = z.string().regex(/^[a-z][a-z0-9-]*$/);
 const when = z.object({ key: id, value: z.string() }).optional();
 const common = {
   node: z.string().min(1),
+  part: z.string().min(1).optional(),
   label: z.string().min(1),
   event: z.literal('click').default('click'),
   when,
@@ -85,63 +101,215 @@ export function readInteractions(project: string): Interactions {
     }
   return data;
 }
+export type PrototypeWarning = CanvasFinding;
+type RuntimeAction = z.infer<typeof actionSchema> & { bounds: Bounds };
+type ResolvedScreen = {
+  frame: DesignNode;
+  bounds: Bounds;
+  actions: Record<string, RuntimeAction>;
+};
+
+function contextual<T>(context: string, resolve: () => T): T {
+  try {
+    return resolve();
+  } catch (error) {
+    throw new Error(
+      `${context}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+function openRefs(tree: DesignNode[]): RefIndex {
+  const index = indexRefs(tree);
+  if (index.problems.length) throw new Error(index.problems.join('; '));
+  return index;
+}
+function legacyWarning(context: string, reference: string): PrototypeWarning[] {
+  return isNodeId(reference)
+    ? [
+        {
+          code: 'node-id',
+          message: `${context} uses node ID ${reference}; IDs change when nodes are inserted or removed. Assign a stable reference with open-prototypen ref set ${reference}=<ref>.`,
+        },
+      ]
+    : [];
+}
+function resolveScreenFrame(
+  index: RefIndex,
+  name: string,
+  entry: Interactions['screens'][string],
+): PlacedNode {
+  return contextual(`Screen ${name}`, () => resolveFrame(index, entry.frame));
+}
+function resolveScreen(
+  index: RefIndex,
+  name: string,
+  entry: Interactions['screens'][string],
+  warnings: PrototypeWarning[],
+): ResolvedScreen {
+  const frame = resolveScreenFrame(index, name, entry);
+  warnings.push(...legacyWarning(`Screen ${name}`, entry.frame));
+  const actions: Record<string, RuntimeAction> = {};
+  for (const [actionName, action] of Object.entries(entry.actions)) {
+    const context = `Action ${name}.${actionName}`;
+    warnings.push(...legacyWarning(context, action.node));
+    const target = contextual(context, () => {
+      const placed = resolveNode(index, action.node);
+      if (placed.frame.id !== frame.node.id || placed.node === frame.node)
+        throw new Error(
+          `${describeNode(placed.node)} is not inside frame ${describeNode(frame.node)}`,
+        );
+      return action.part ? resolvePart(placed, action.part) : placed;
+    });
+    const bounds = {
+      x: target.bounds.x - frame.bounds.x,
+      y: target.bounds.y - frame.bounds.y,
+      width: target.bounds.width,
+      height: target.bounds.height,
+    };
+    const text = target.node.type === 'TEXT';
+    const textHint = text
+      ? ' Headless OpenPencil does not measure text and reports 100×100 bounds; use a sized container or a transparent hit area as the action node.'
+      : '';
+    if (bounds.width <= 0 || bounds.height <= 0)
+      throw new Error(
+        `${context}: ${describeNode(target.node)} has empty bounds`,
+      );
+    // One pixel of tolerance absorbs rounding of fractional geometry.
+    if (
+      bounds.x < -1 ||
+      bounds.y < -1 ||
+      bounds.x + bounds.width > frame.bounds.width + 1 ||
+      bounds.y + bounds.height > frame.bounds.height + 1
+    )
+      throw new Error(
+        `${context}: hotspot ${bounds.width}×${bounds.height} at ${bounds.x},${bounds.y} extends outside frame ${frame.node.name} (${frame.bounds.width}×${frame.bounds.height}).${textHint}`,
+      );
+    if (text)
+      warnings.push({ code: 'text-action', message: `${context}:${textHint}` });
+    actions[actionName] = { ...action, bounds };
+  }
+  return { frame: frame.node, bounds: frame.bounds, actions };
+}
+function reachabilityWarnings(interactions: Interactions): PrototypeWarning[] {
+  const reached = new Set([interactions.initialScreen]);
+  const queue = [interactions.initialScreen];
+  for (let screen = queue.shift(); screen; screen = queue.shift())
+    for (const action of Object.values(
+      interactions.screens[screen]?.actions ?? {},
+    ))
+      if ('target' in action && action.target && !reached.has(action.target)) {
+        reached.add(action.target);
+        queue.push(action.target);
+      }
+  return Object.keys(interactions.screens)
+    .filter((screen) => !reached.has(screen))
+    .map((screen) => ({
+      code: 'unreachable-screen',
+      message: `Screen ${screen} cannot be reached from ${interactions.initialScreen} through any action target`,
+    }));
+}
+export function resolveInteractions(
+  project: string,
+  interactions = readInteractions(project),
+): { screens: Record<string, ResolvedScreen>; warnings: PrototypeWarning[] } {
+  const index = openRefs(inspectCanvas(project).tree);
+  const warnings: PrototypeWarning[] = [];
+  const screens = Object.fromEntries(
+    Object.entries(interactions.screens).map(([name, entry]) => [
+      name,
+      resolveScreen(index, name, entry, warnings),
+    ]),
+  );
+  return {
+    screens,
+    warnings: [...warnings, ...reachabilityWarnings(interactions)],
+  };
+}
 export function inspectScreen(project: string, screen: string) {
   const entry = readInteractions(project).screens[screen];
   if (!entry) throw new Error(`Unknown screen: ${screen}`);
-  const canvas = inspectCanvas(project);
-  const frame = findNode(canvas.tree, entry.frame);
-  if (!frame) throw new Error(`Unknown frame: ${entry.frame}`);
+  const warnings: PrototypeWarning[] = [];
+  const resolved = resolveScreen(
+    openRefs(inspectCanvas(project).tree),
+    screen,
+    entry,
+    warnings,
+  );
   return {
     screen,
-    frame: { ...frame.node, bounds: frame.bounds },
-    actions: Object.fromEntries(
-      Object.entries(entry.actions).map(([name, action]) => [
-        name,
-        {
-          ...action,
-          bounds: relativeBounds(canvas.tree, entry.frame, action.node),
-        },
-      ]),
-    ),
+    frame: { ...resolved.frame, bounds: resolved.bounds },
+    actions: resolved.actions,
+    warnings,
   };
 }
 export function renderScreens(project: string, screen?: string): string[] {
   const interactions = readInteractions(project);
-  const canvas = inspectCanvas(project);
   const entries = screen
     ? ([[screen, interactions.screens[screen]]] as const)
     : Object.entries(interactions.screens);
-  const output: string[] = [];
-  for (const [name, entry] of entries) {
+  const index = openRefs(inspectCanvas(project).tree);
+  // Resolve every frame before exporting so a stale reference cannot overwrite a good render.
+  const frames = entries.map(([name, entry]) => {
     if (!entry) throw new Error(`Unknown screen: ${name}`);
-    if (!findNode(canvas.tree, entry.frame))
-      throw new Error(`Unknown frame: ${entry.frame}`);
-    const path = join(workspace(project), 'prototype/renders', `${name}.png`);
-    output.push(renderFrame(project, entry.frame, path));
+    return [name, resolveScreenFrame(index, name, entry)] as const;
+  });
+  return frames.map(([name, frame]) =>
+    renderFrame(
+      project,
+      frame.node.id,
+      join(workspace(project), 'prototype/renders', `${name}.png`),
+      frame.bounds,
+    ),
+  );
+}
+export function validatePrototypeCanvas(project: string): CanvasValidation {
+  let resolved: ReturnType<typeof resolveInteractions> | undefined;
+  let interactionError: string | undefined;
+  try {
+    resolved = resolveInteractions(project);
+  } catch (error) {
+    interactionError = error instanceof Error ? error.message : String(error);
   }
-  return output;
+  const result = validateCanvas(
+    project,
+    Object.fromEntries(
+      Object.entries(resolved?.screens ?? {}).map(([name, screen]) => [
+        name,
+        screen.frame.id,
+      ]),
+    ),
+  );
+  if (interactionError) {
+    result.findings.push({ code: 'interactions', message: interactionError });
+    result.valid = false;
+  }
+  result.warnings.push(...(resolved?.warnings ?? []));
+  return result;
 }
 
-type RuntimeAction = z.infer<typeof actionSchema> & { bounds: Bounds };
 export function compilePrototype(project: string): {
   output: string;
   screens: number;
+  warnings: PrototypeWarning[];
 } {
   const interactions = readInteractions(project);
+  const resolved = resolveInteractions(project, interactions);
   if (loadConfig(project).quality.nativeDesignSystem) {
-    const frames = Object.fromEntries(
-      Object.entries(interactions.screens).map(([name, screen]) => [
-        name,
-        screen.frame,
-      ]),
+    const validation = validateCanvas(
+      project,
+      Object.fromEntries(
+        Object.entries(resolved.screens).map(([name, screen]) => [
+          name,
+          screen.frame.id,
+        ]),
+      ),
     );
-    const validation = validateCanvas(project, frames);
     if (!validation.valid)
       throw new Error(
         `Native design system is invalid: ${validation.findings.map((finding) => finding.message).join('; ')}`,
       );
+    resolved.warnings.push(...validation.warnings);
   }
-  const canvas = inspectCanvas(project);
   const output = join(workspace(project), 'prototype/dist');
   mkdirSync(join(output, 'screens'), { recursive: true });
   const screens: Record<
@@ -155,24 +323,22 @@ export function compilePrototype(project: string): {
     }
   > = {};
   for (const [name, entry] of Object.entries(interactions.screens)) {
-    const frame = findNode(canvas.tree, entry.frame);
-    if (!frame) throw new Error(`Unknown frame: ${entry.frame}`);
+    const screen = resolved.screens[name] as ResolvedScreen;
     const image = join(workspace(project), 'prototype/renders', `${name}.png`);
     if (!existsSync(image))
       throw new Error(`Missing render for ${name}. Run render first.`);
+    const size = pngSize(image);
+    if (!sameSize(size, screen.bounds))
+      throw new Error(
+        `Render for ${name} is ${size.width}×${size.height} but frame ${screen.frame.name} is ${screen.bounds.width}×${screen.bounds.height}. Run render again.`,
+      );
     copyFileSync(image, join(output, 'screens', `${name}.png`));
-    const actions: Record<string, RuntimeAction> = {};
-    for (const [actionName, action] of Object.entries(entry.actions))
-      actions[actionName] = {
-        ...action,
-        bounds: relativeBounds(canvas.tree, entry.frame, action.node),
-      };
     screens[name] = {
-      width: frame.bounds.width,
-      height: frame.bounds.height,
+      width: screen.bounds.width,
+      height: screen.bounds.height,
       title: entry.title,
       content: entry.content,
-      actions,
+      actions: screen.actions,
     };
   }
   const manifest = {
@@ -199,5 +365,9 @@ export function compilePrototype(project: string): {
     .replace('__LANG__', htmlLang)
     .replace('__DATA__', safeData);
   writeFileSync(join(output, 'index.html'), html);
-  return { output, screens: Object.keys(screens).length };
+  return {
+    output,
+    screens: Object.keys(screens).length,
+    warnings: resolved.warnings,
+  };
 }

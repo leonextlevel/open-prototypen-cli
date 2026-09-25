@@ -71,6 +71,7 @@ it('initializes both harnesses and serves artifact contracts through the CLI', (
   );
   expect(contract.outputPath).toBe('docs/design/brief.md');
   expect(contract.rules.length).toBeGreaterThan(0);
+  expect(contract.template).toContain('language: pt-BR');
   const path = join(root, contract.outputPath);
   mkdirSync(join(path, '..'), { recursive: true });
   writeFileSync(
@@ -105,7 +106,16 @@ it('initializes both harnesses and serves artifact contracts through the CLI', (
     join(root, 'docs/design/design/system.yaml'),
     "version: 1\ntokens:\n  - name: color.surface\n    type: COLOR\n    value: '#112233'\ncomponents:\n  - name: BookRow\n    states: [default]\n    screens: [collection]\n",
   );
-  expect(cli(root, 'system', 'apply').status).toBe(0);
+  const applied = cli(root, 'system', 'apply', '--json');
+  expect(applied.status).toBe(0);
+  expect(JSON.parse(applied.stdout).created).toEqual(['color.surface']);
+  expect(JSON.parse(cli(root, 'ref', 'list', '--json').stdout)).toMatchObject({
+    refs: [],
+    problems: [],
+  });
+  expect(cli(root, 'ref', 'set', '0:1=Invalid Ref', '--json').stderr).toContain(
+    'expected <node-id>=<ref>',
+  );
   expect(
     JSON.parse(cli(root, 'inspect', 'system', '--json').stdout).native
       .variables,
