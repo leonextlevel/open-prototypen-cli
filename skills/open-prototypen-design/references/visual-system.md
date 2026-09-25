@@ -35,7 +35,7 @@ components:
     screens: [collection]
 ```
 
-The native components for this example are `BookRow/default` and `BookRow/selected`. Add only components and states actually used by the product. After editing the contract, run `open-prototypen system apply` to create the `.fig` if necessary and synchronize variables. Then build components, bind token variables to meaningful properties, and use linked instances in the declared screens. `system apply` synchronizes variables; it does not compose components or screens.
+The native components for this example are `BookRow/default` and `BookRow/selected`. Add only components and states actually used by the product. After editing the contract, run `open-prototypen system apply` to create the `.fig` if necessary and synchronize variables. Create a `Design System` page with all native component masters and their states, plus visible color, typography, and spacing samples labeled by role and value. Bind token variables to meaningful properties in the masters and samples where supported, and use linked instances in the declared screens. `system apply` synchronizes variables; it does not compose the reference page, components, or screens.
 
 ## Component inventory and states
 

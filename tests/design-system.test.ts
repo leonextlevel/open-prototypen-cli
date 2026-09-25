@@ -15,6 +15,7 @@ import {
   evalDocument,
   inspectCanvas,
   relativeBounds,
+  renderFrame,
 } from '../packages/openpencil/src/index.js';
 import {
   applyDesignSystem,
@@ -192,6 +193,11 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
     const shared = figma.createPage(); shared.name = 'Shared';
     const system = figma.createPage(); system.name = 'Design System';
     figma.currentPage = system;
+    const samples = figma.createFrame(); samples.name = 'Color, type, and spacing samples'; samples.resize(320, 240);
+    samples.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 }, opacity: 1 }];
+    const swatch = figma.createRectangle(); swatch.name = 'color.surface'; swatch.resize(80, 80); samples.appendChild(swatch);
+    const type = figma.createText(); type.name = 'Body type'; type.characters = 'Sample text'; type.y = 100; samples.appendChild(type);
+    const rhythm = figma.createRectangle(); rhythm.name = 'space.md'; rhythm.resize(12, 12); rhythm.y = 160; samples.appendChild(rhythm);
     const color = figma.getLocalVariables().find((item) => item.name === 'color.surface');
     const spacing = figma.getLocalVariables().find((item) => item.name === 'space.md');
     const component = figma.createComponent(); component.name = 'BookRow/default'; component.resize(100, 40);
@@ -199,6 +205,8 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
     component.layoutMode = 'VERTICAL'; component.itemSpacing = 12;
     figma.bindVariable(component.id, 'fills/0/color', color.id);
     figma.bindVariable(component.id, 'itemSpacing', spacing.id);
+    swatch.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1, a: 1 }, opacity: 1 }];
+    figma.bindVariable(swatch.id, 'fills/0/color', color.id);
     const selected = figma.createComponent(); selected.name = 'BookRow/selected'; selected.resize(100, 40);
     figma.currentPage = collection;
     const collectionFrame = figma.createFrame(); collectionFrame.name = 'collection'; collectionFrame.resize(200, 160);
@@ -231,6 +239,20 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
     ),
   ).toEqual(['Flow: Collection', 'Flow: Detail', 'Shared', 'Design System']);
   expect(canvas.tree.map((node) => node.name)).toContain('detail');
+  const samples = canvas.tree.find(
+    (node) => node.name === 'Color, type, and spacing samples',
+  );
+  expect(samples?.children?.map((node) => node.name)).toEqual([
+    'color.surface',
+    'Body type',
+    'space.md',
+  ]);
+  expect(samples).toBeTruthy();
+  if (samples) {
+    const sampleImage = join(root, 'samples.png');
+    renderFrame(root, samples.id, sampleImage);
+    expect(existsSync(sampleImage)).toBe(true);
+  }
   expect(relativeBounds(canvas.tree, ids.collection, ids.action)).toMatchObject(
     { x: 30, y: 90 },
   );
@@ -239,6 +261,20 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
   const component = native.nodes.find(
     (node) => node.type === 'COMPONENT' && node.name === 'BookRow/default',
   );
+  const systemPage = (canvas.pages as { id: string; name: string }[]).find(
+    (page) => page.name === 'Design System',
+  );
+  expect(native.nodes.find((node) => node.id === samples?.id)?.parentId).toBe(
+    systemPage?.id,
+  );
+  expect(native.nodes.filter((node) => node.type === 'COMPONENT')).toHaveLength(
+    2,
+  );
+  expect(
+    native.nodes
+      .filter((node) => node.type === 'COMPONENT')
+      .every((node) => node.parentId === systemPage?.id),
+  ).toBe(true);
   const instance = native.nodes.find((node) => node.type === 'INSTANCE');
   expect(instance?.componentId).toBe(component?.id);
   writeFileSync(

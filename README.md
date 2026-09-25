@@ -38,7 +38,7 @@ open-prototypen --project /path/to/product render
 open-prototypen --project /path/to/product prototype
 ```
 
-`system apply` creates the `.fig` when needed and synchronizes its native variables. The agent makes the visual design with OpenPencil; the CLI uses the pinned `@open-pencil/cli@0.15.1` for inspection and export. Define frames and node-based actions in `docs/design/prototype/interactions.yaml` as shown in [prototype interactions](docs/interactions.md). `render` exports PNGs to `docs/design/prototype/renders/`; `prototype` writes a local site to `docs/design/prototype/dist/` that can be opened at `index.html`.
+`system apply` creates the `.fig` when needed and synchronizes its native variables. The agent builds a `Design System` page with every component master and state plus visual samples of colors, typography, and spacing, then organizes screen frames by flow on other pages. The CLI uses the pinned `@open-pencil/cli@0.15.1` for inspection and export. Define frames and node-based actions in `docs/design/prototype/interactions.yaml` as shown in [prototype interactions](docs/interactions.md). `render` exports PNGs to `docs/design/prototype/renders/`; `prototype` writes a local site to `docs/design/prototype/dist/` that can be opened at `index.html`.
 
 ## Develop and release
 

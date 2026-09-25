@@ -23,7 +23,7 @@ TODO: Explain semantic color roles, foreground/background pairs, and state color
 
 ## Components
 
-TODO: Explain the reusable component inventory in `design/system.yaml`: purpose, anatomy, token use, content limits, and screens. Build native components and linked instances in the `.fig`.
+TODO: Explain the reusable component inventory in `design/system.yaml`: purpose, anatomy, token use, content limits, and screens. Put all native component masters and states on the `Design System` page of the `.fig`, along with color, typography, and spacing samples. Use linked instances in screen frames.
 
 ## States
 
