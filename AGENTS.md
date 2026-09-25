@@ -14,7 +14,7 @@ Write tool code, skills, docs, CLI diagnostics, and structural keys in English. 
 
 ## Issues, pull requests, and versioning
 
-Every implementation or fix starts from a GitHub issue and lands through a pull request; do not push to `main`. Name branches `<type>/<issue>-<topic>` (for example `fix/42-hotspot-precedence`), use Conventional Commits with a `Refs: #<issue>` footer, and put `Closes #<issue>` in the pull request description. Write issues in English with the structure in `CONTRIBUTING.md`, generic reproducible examples, and no private project data. Record notable user-facing changes under `[Unreleased]` in `CHANGELOG.md` in the same pull request. Do not bump package versions, close the changelog section, or create a release tag until the maintainer explicitly says a version is finished. See `CONTRIBUTING.md` and `docs/releasing.md`.
+Every implementation or fix starts from a GitHub issue and lands through a pull request; do not push to `main`. Name branches `<type>/<issue>-<topic>` (for example `fix/42-hotspot-precedence`), use Conventional Commits with a `Refs: #<issue>` footer and keep each commit self-contained, since pull requests are rebase-merged, and put `Closes #<issue>` in the pull request description. Write issues in English with the structure in `CONTRIBUTING.md`, generic reproducible examples, and no private project data. Record notable user-facing changes under `[Unreleased]` in `CHANGELOG.md` in the same pull request. Do not bump package versions, close the changelog section, or create a release tag until the maintainer explicitly says a version is finished. See `CONTRIBUTING.md` and `docs/releasing.md`.
 
 ## Verification
 
