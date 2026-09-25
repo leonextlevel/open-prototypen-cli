@@ -238,3 +238,122 @@ it.skipIf(!existsSync('/usr/bin/google-chrome'))(
   },
   30000,
 );
+
+it.skipIf(!existsSync('/usr/bin/google-chrome'))(
+  'renders only the effective action on a shared node for every input method',
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'open-prototypen-precedence-'));
+    projects.push(root);
+    initProject(root, 'codex');
+    writeFileSync(
+      join(root, 'docs/design/config.yaml'),
+      'version: 1\nschema: default\nlanguage:\n  mode: auto\n  fallback: en\ndesignEngine: openpencil\n',
+    );
+    mkdirSync(join(root, 'docs/design/design'), { recursive: true });
+    writeFileSync(
+      join(root, 'docs/design/design/system.yaml'),
+      "version: 1\ntokens:\n  - name: color.surface\n    type: COLOR\n    value: '#112233'\ncomponents:\n  - name: Probe\n    states: [default]\n",
+    );
+    await applyDesignSystem(root);
+    evalDocument(
+      root,
+      `
+      const form = figma.createFrame(); form.name = 'form'; form.resize(200, 160);
+      const submit = figma.createRectangle(); submit.name = 'submit'; submit.resize(60, 30);
+      form.appendChild(submit); submit.x = 20; submit.y = 20;
+      const simulate = figma.createRectangle(); simulate.name = 'simulate'; simulate.resize(60, 30);
+      form.appendChild(simulate); simulate.x = 100; simulate.y = 20;
+      const done = figma.createFrame(); done.name = 'done'; done.resize(200, 160); done.x = 300;
+      const error = figma.createFrame(); error.name = 'error'; error.resize(200, 160); error.x = 600;
+    `,
+      true,
+    );
+    const tree = inspectCanvas(root).tree;
+    const id = (name: string) => {
+      const visit = (nodes: typeof tree): string | undefined =>
+        nodes
+          .map((node) =>
+            node.name === name ? node.id : visit(node.children ?? []),
+          )
+          .find(Boolean);
+      return visit(tree) ?? '';
+    };
+    setRefs(
+      root,
+      ['form', 'submit', 'simulate', 'done', 'error'].map((ref) => ({
+        id: id(ref),
+        ref,
+      })),
+    );
+    writeFileSync(
+      join(root, 'docs/design/prototype/interactions.yaml'),
+      `version: 1
+initialScreen: form
+screens:
+  form:
+    frame: form
+    title: Form
+    content: Form screen.
+    actions:
+      submit:
+        node: submit
+        label: Submit
+        action: navigate
+        target: done
+      simulate:
+        node: simulate
+        label: Simulate server error
+        action: set-state
+        key: outcome
+        value: error
+      submit-error:
+        node: submit
+        label: Submit
+        when: { key: outcome, value: error }
+        action: navigate
+        target: error
+  done:
+    frame: done
+    title: Done
+    content: Done screen.
+  error:
+    frame: error
+    title: Error
+    content: Error screen.
+`,
+    );
+    renderScreens(root);
+    const result = compilePrototype(root);
+    expect(
+      result.warnings.filter((warning) => warning.code === 'covered-action'),
+    ).toEqual([]);
+    const browser = await chromium.launch({
+      executablePath: '/usr/bin/google-chrome',
+      headless: true,
+      args: ['--no-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      const url = pathToFileURL(join(result.output, 'index.html')).href;
+      const submit = page.getByRole('button', { name: 'Submit' });
+      await page.goto(url);
+      expect(await submit.count()).toBe(1);
+      await page.getByRole('button', { name: 'Simulate server error' }).click();
+      expect(await submit.count()).toBe(1);
+      await submit.focus();
+      await page.keyboard.press('Enter');
+      await expect
+        .poll(() => page.locator('body').getAttribute('data-screen'))
+        .toBe('error');
+      await page.goto(url);
+      await page.getByRole('button', { name: 'Simulate server error' }).click();
+      await submit.click();
+      await expect
+        .poll(() => page.locator('body').getAttribute('data-screen'))
+        .toBe('error');
+    } finally {
+      await browser.close();
+    }
+  },
+  30000,
+);
