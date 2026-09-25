@@ -5,7 +5,7 @@ This project is maintained by one person with agent assistance. Keep the process
 1. An issue describes the problem.
 2. A topic branch implements it.
 3. A pull request links the issue, and CI verifies it.
-4. The maintainer squash-merges the pull request into `main`, which closes the issue.
+4. The maintainer rebase-merges the pull request into `main`, which closes the issue.
 
 Do not push routine work directly to `main`.
 
@@ -65,17 +65,25 @@ Refs: #42
 
 Open a pull request as soon as the branch has something to verify; use a draft while it is incomplete. One pull request resolves one issue, or a few issues that cannot ship separately.
 
-- Title it as the Conventional Commit that will land on `main`, because squash merging uses it as the commit subject.
+- Title it as a Conventional Commit that summarizes the change.
 - Link every issue in the description with `Closes #42` when the pull request resolves it, or `Refs #42` when it only contributes. The **Issue link** check fails without a link.
 - Complete the checklist in the pull request template.
-- Keep the branch up to date with `main` and address review comments with new commits; they are squashed on merge.
+- Keep the branch up to date with `main` by rebasing, not by merging `main` into it.
 
 CI runs `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, `pnpm test`, and `npm pack --dry-run` on every pull request and on `main`. Both **CI / checks** and **Issue link / issue-link** must pass before merging. Run the same commands locally first; test the packed CLI when changing packaging or runtime asset resolution.
 
-The maintainer squash-merges approved pull requests and deletes the branch. GitHub closes the linked issues when the merge lands on `main`.
+Pull requests are merged with **Rebase and merge**, so every commit on the branch lands on `main` as written and `main` keeps a linear history without merge commits. Each commit therefore has to stand on its own: a meaningful Conventional Commit with a `Refs:` footer that leaves the checks passing. Commit review fixes as fixups of the commit they correct, and fold them in before the merge:
+
+```sh
+git commit --fixup=<commit>
+git rebase -i --autosquash origin/main
+git push --force-with-lease
+```
+
+The maintainer merges approved pull requests; GitHub then deletes the branch and closes the linked issues. Rebasing gives the commits new hashes on `main`.
 
 ## Changelog and versions
 
 For every notable user-facing change, add a short entry under the appropriate `Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, or `Security` heading in `[Unreleased]` in `CHANGELOG.md`, in the same pull request. Skip internal-only noise. Keep entries understandable without reading commits. Use [Semantic Versioning](https://semver.org/); before `1.0.0`, call out breaking changes clearly even when the next version is a minor increment.
 
-Do not bump versions, move changelog entries out of `[Unreleased]`, or create release tags during ordinary work. Wait until the maintainer explicitly says a version is finished. Then open a `Release vX.Y.Z` issue and prepare the release in a `chore/<issue>-release-vX.Y.Z` pull request that chooses the next version from the accumulated changelog, updates the root package version and lockfile, and closes the changelog section. After it merges, create an annotated `vX.Y.Z` tag on the merge commit. See [the release procedure](docs/releasing.md).
+Do not bump versions, move changelog entries out of `[Unreleased]`, or create release tags during ordinary work. Wait until the maintainer explicitly says a version is finished. Then open a `Release vX.Y.Z` issue and prepare the release in a `chore/<issue>-release-vX.Y.Z` pull request that chooses the next version from the accumulated changelog, updates the root package version and lockfile, and closes the changelog section. After it merges, create an annotated `vX.Y.Z` tag on the resulting commit in `main`. See [the release procedure](docs/releasing.md).
