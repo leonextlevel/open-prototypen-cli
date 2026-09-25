@@ -151,6 +151,8 @@ it.skipIf(!existsSync('/usr/bin/google-chrome'))(
       const home = figma.createFrame(); home.name = 'home'; home.resize(200, 160);
       const open = figma.createRectangle(); open.name = 'open'; open.resize(60, 30);
       home.appendChild(open); open.x = 20; open.y = 20;
+      const peek = figma.createRectangle(); peek.name = 'peek'; peek.resize(60, 30);
+      home.appendChild(peek); peek.x = 100; peek.y = 20;
       const sheet = figma.createFrame(); sheet.name = 'sheet'; sheet.resize(200, 80); sheet.x = 300;
       const close = figma.createRectangle(); close.name = 'close'; close.resize(60, 30);
       sheet.appendChild(close); close.x = 20; close.y = 20;
@@ -169,11 +171,14 @@ it.skipIf(!existsSync('/usr/bin/google-chrome'))(
     };
     setRefs(
       root,
-      ['home', 'open', 'sheet', 'close'].map((ref) => ({ id: id(ref), ref })),
+      ['home', 'open', 'peek', 'sheet', 'close'].map((ref) => ({
+        id: id(ref),
+        ref,
+      })),
     );
     writeFileSync(
       join(root, 'docs/design/prototype/interactions.yaml'),
-      `version: 1\ninitialScreen: home\nscreens:\n  home:\n    frame: home\n    title: Home\n    content: Home screen.\n    actions:\n      open:\n        node: open\n        label: Open sheet\n        action: open-overlay\n        target: sheet\n  sheet:\n    frame: sheet\n    title: Sheet\n    content: Sheet content.\n    actions:\n      close:\n        node: close\n        label: Close sheet\n        action: close-overlay\n`,
+      `version: 1\ninitialScreen: home\nscreens:\n  home:\n    frame: home\n    title: Home\n    content: Home screen.\n    actions:\n      open:\n        node: open\n        label: Open sheet\n        action: open-overlay\n        target: sheet\n      peek:\n        node: peek\n        label: Peek sheet\n        action: open-overlay\n        target: sheet\n        placement: bottom\n  sheet:\n    frame: sheet\n    title: Sheet\n    content: Sheet content.\n    actions:\n      close:\n        node: close\n        label: Close sheet\n        action: close-overlay\n`,
     );
     renderScreens(root);
     const result = compilePrototype(root);
@@ -216,8 +221,17 @@ it.skipIf(!existsSync('/usr/bin/google-chrome'))(
         .poll(() => page.locator('body').getAttribute('data-overlay'))
         .toBe('');
       expect(
-        await page.getByRole('button', { name: 'Open sheet' }).count(),
-      ).toBe(1);
+        await page.evaluate(() => document.querySelector('[inert]')),
+      ).toBeNull();
+      await page.getByRole('button', { name: 'Peek sheet' }).click();
+      const base = await page.locator('.stage[inert]').boundingBox();
+      const sheet = await dialog.boundingBox();
+      expect(sheet?.width).toBeCloseTo(base?.width ?? 0, 0);
+      expect(sheet?.x).toBeCloseTo(base?.x ?? 0, 0);
+      expect((sheet?.y ?? 0) + (sheet?.height ?? 0)).toBeCloseTo(
+        (base?.y ?? 0) + (base?.height ?? 0),
+        0,
+      );
     } finally {
       await browser.close();
     }

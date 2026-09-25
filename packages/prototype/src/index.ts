@@ -50,7 +50,12 @@ const common = {
 const actionSchema = z.discriminatedUnion('action', [
   z.object({ ...common, action: z.literal('navigate'), target: id }),
   z.object({ ...common, action: z.literal('back') }),
-  z.object({ ...common, action: z.literal('open-overlay'), target: id }),
+  z.object({
+    ...common,
+    action: z.literal('open-overlay'),
+    target: id,
+    placement: z.enum(['center', 'bottom']).default('center'),
+  }),
   z.object({ ...common, action: z.literal('close-overlay') }),
   z.object({
     ...common,

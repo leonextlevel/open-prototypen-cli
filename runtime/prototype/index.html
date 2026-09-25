@@ -72,6 +72,7 @@
       const state = {};
       let current = data.initialScreen;
       let overlay = null;
+      let placement = 'center';
 
       function stage(name) {
         const config = data.screens[name];
@@ -131,6 +132,7 @@
             break;
           case 'open-overlay':
             overlay = action.target;
+            placement = action.placement || 'center';
             break;
           case 'close-overlay':
             overlay = null;
@@ -171,11 +173,25 @@
           dialog.tabIndex = -1;
           backdrop.append(dialog);
           app.append(backdrop);
+          if (placement === 'bottom') {
+            // Anchor to the bottom edge of the screen below, at that screen's scale.
+            const box = base.getBoundingClientRect();
+            const scale = box.width / data.screens[current].width;
+            const width = data.screens[overlay].width * scale;
+            dialog.style.position = 'fixed';
+            dialog.style.width = width + 'px';
+            dialog.style.left = box.left + (box.width - width) / 2 + 'px';
+            dialog.style.top =
+              box.bottom - data.screens[overlay].height * scale + 'px';
+          }
           dialog.focus();
         }
         document.body.dataset.screen = current;
         document.body.dataset.overlay = overlay || '';
       }
+      window.addEventListener('resize', () => {
+        if (overlay && placement === 'bottom') draw();
+      });
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && overlay) {
           overlay = null;
