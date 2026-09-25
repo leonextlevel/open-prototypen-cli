@@ -14,6 +14,7 @@ import { initProject, installSkills } from '../packages/harness/src/index.js';
 import {
   evalDocument,
   inspectCanvas,
+  relativeBounds,
 } from '../packages/openpencil/src/index.js';
 import {
   applyDesignSystem,
@@ -178,3 +179,72 @@ it('requires manifest components, bound tokens, and linked screen instances befo
     'Native design system is invalid',
   );
 }, 20000);
+
+it('inspects, renders, and compiles screens across flow pages', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const collection = figma.currentPage;
+    collection.name = 'Flow: Collection';
+    const detail = figma.createPage(); detail.name = 'Flow: Detail';
+    const shared = figma.createPage(); shared.name = 'Shared';
+    const system = figma.createPage(); system.name = 'Design System';
+    figma.currentPage = system;
+    const color = figma.getLocalVariables().find((item) => item.name === 'color.surface');
+    const spacing = figma.getLocalVariables().find((item) => item.name === 'space.md');
+    const component = figma.createComponent(); component.name = 'BookRow/default'; component.resize(100, 40);
+    component.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1, a: 1 }, opacity: 1 }];
+    component.layoutMode = 'VERTICAL'; component.itemSpacing = 12;
+    figma.bindVariable(component.id, 'fills/0/color', color.id);
+    figma.bindVariable(component.id, 'itemSpacing', spacing.id);
+    const selected = figma.createComponent(); selected.name = 'BookRow/selected'; selected.resize(100, 40);
+    figma.currentPage = collection;
+    const collectionFrame = figma.createFrame(); collectionFrame.name = 'collection'; collectionFrame.resize(200, 160);
+    const instance = component.createInstance(); collectionFrame.appendChild(instance); instance.x = 20; instance.y = 30;
+    const action = figma.createRectangle(); action.name = 'open-detail'; action.resize(40, 30);
+    collectionFrame.appendChild(action); action.x = 30; action.y = 90;
+    figma.currentPage = detail;
+    const detailFrame = figma.createFrame(); detailFrame.name = 'detail'; detailFrame.resize(200, 160);
+    figma.currentPage = shared;
+    const sharedFrame = figma.createFrame(); sharedFrame.name = 'shared'; sharedFrame.resize(200, 160);
+  `,
+    true,
+  );
+  const canvas = inspectCanvas(root);
+  const collection = canvas.tree.find((node) => node.name === 'collection');
+  const detail = canvas.tree.find((node) => node.name === 'detail');
+  const shared = canvas.tree.find((node) => node.name === 'shared');
+  const action = collection?.children?.find(
+    (node) => node.name === 'open-detail',
+  );
+  const ids = {
+    collection: collection?.id ?? '',
+    detail: detail?.id ?? '',
+    shared: shared?.id ?? '',
+    action: action?.id ?? '',
+  };
+  expect(
+    (canvas.pages as unknown[]).map(
+      (page: unknown) => (page as { name: string }).name,
+    ),
+  ).toEqual(['Flow: Collection', 'Flow: Detail', 'Shared', 'Design System']);
+  expect(canvas.tree.map((node) => node.name)).toContain('detail');
+  expect(relativeBounds(canvas.tree, ids.collection, ids.action)).toMatchObject(
+    { x: 30, y: 90 },
+  );
+  expect(validateCanvas(root, { collection: ids.collection }).valid).toBe(true);
+  const native = inspectNativeSystem(root);
+  const component = native.nodes.find(
+    (node) => node.type === 'COMPONENT' && node.name === 'BookRow/default',
+  );
+  const instance = native.nodes.find((node) => node.type === 'INSTANCE');
+  expect(instance?.componentId).toBe(component?.id);
+  writeFileSync(
+    join(root, 'docs/design/prototype/interactions.yaml'),
+    `version: 1\ninitialScreen: collection\nscreens:\n  collection:\n    frame: '${ids.collection}'\n    title: Collection\n    content: Book list.\n    actions:\n      open-detail:\n        node: '${ids.action}'\n        label: Open detail\n        action: navigate\n        target: detail\n  detail:\n    frame: '${ids.detail}'\n    title: Detail\n    content: Book detail.\n  shared:\n    frame: '${ids.shared}'\n    title: Shared\n    content: Shared screen.\n`,
+  );
+  expect(renderScreens(root)).toHaveLength(3);
+  expect(compilePrototype(root).screens).toBe(3);
+}, 30000);

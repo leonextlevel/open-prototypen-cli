@@ -4,6 +4,10 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 
 ## [Unreleased]
 
+### Added
+
+- Organize OpenPencil screens across flow pages while inspecting, rendering, and compiling frames from every page.
+
 ## [0.1.0] - 2026-09-25
 
 ### Added

@@ -1,6 +1,6 @@
 # Prototype interactions
 
-`docs/design/prototype/interactions.yaml` maps screen IDs to OpenPencil frame IDs and action IDs to descendant nodes. Rendered screen images are derived from these frames. Node geometry determines hotspot positions.
+`docs/design/prototype/interactions.yaml` maps screen IDs to OpenPencil frame IDs and action IDs to descendant nodes. Frames may live on different pages of the same `.fig`; shared screens need only one frame. Rendered screen images are derived from these frames. Node geometry determines hotspot positions.
 
 ```yaml
 version: 1
@@ -29,7 +29,7 @@ screens:
         action: back
 ```
 
-Use `inspect canvas --json` to find IDs and `inspect screen <id> --json` to confirm bounds. The supported actions are:
+Use `inspect canvas --json` to find IDs on every page after saving the `.fig`, and `inspect screen <id> --json` to confirm bounds. The supported actions are:
 
 Give screens a `title` and `content`, and actions a `label`, in the project's language. These are required. `content` should include all meaningful visible information because the PNG itself has empty alternative text. The runtime presents this content to screen readers while preserving the visual image.
 

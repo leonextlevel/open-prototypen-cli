@@ -51,10 +51,29 @@ export function inspectCanvas(project: string): {
   const file = figPath(project);
   if (!existsSync(file))
     throw new Error(`OpenPencil document does not exist: ${file}`);
+  const tree = evalDocument(
+    project,
+    `
+    const graph = figma.graph;
+    const visit = (id) => {
+      const node = graph.getNode(id);
+      if (!node) return null;
+      const result = {
+        id: node.id, name: node.name, type: node.type,
+        x: Math.round(node.x), y: Math.round(node.y),
+        width: Math.round(node.width), height: Math.round(node.height)
+      };
+      if (node.childIds.length) {
+        result.children = node.childIds.map(visit).filter(Boolean);
+      }
+      return result;
+    };
+    return graph.getPages().flatMap((page) => page.childIds.map(visit).filter(Boolean));`,
+  ) as DesignNode[];
   return {
     document: file,
     pages: JSON.parse(run(['pages', file, '--json'])),
-    tree: JSON.parse(run(['tree', file, '--json'])) as DesignNode[],
+    tree,
   };
 }
 export function findNode(
