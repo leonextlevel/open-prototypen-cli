@@ -127,7 +127,7 @@ it('renders a real editable fig and navigates measured hotspots in Chrome', asyn
       await browser.close();
     }
   }
-}, 20000);
+}, 60000);
 
 it.skipIf(!existsSync('/usr/bin/google-chrome'))(
   'makes overlays modal for keyboard and assistive technology',

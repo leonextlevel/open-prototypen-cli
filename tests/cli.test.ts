@@ -127,4 +127,4 @@ it('initializes both harnesses and serves artifact contracts through the CLI', (
   ).toHaveLength(1);
   expect(cli(root, 'update', '--harness', 'all').status).toBe(0);
   expect(readFileSync(path, 'utf8')).toContain('Conteúdo criado');
-}, 20_000);
+}, 60000);

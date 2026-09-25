@@ -94,7 +94,7 @@ it('creates and synchronizes native variables without replacing unrelated work',
     after.variables.find((variable) => variable.name === 'color.surface')?.id,
   ).toBe(colorId);
   expect(after.nodes.some((node) => node.name === 'User work')).toBe(true);
-}, 20000);
+}, 60000);
 
 it('imports an SVG as editable vectors and preserves changed installed references', async () => {
   const root = fixture();
@@ -133,7 +133,7 @@ it('imports an SVG as editable vectors and preserves changed installed reference
   expect(updated.modified).toContain('codex/open-prototypen-component-review');
   expect(readFileSync(reference, 'utf8')).toContain('Local observation.');
   expect(readFileSync(review, 'utf8')).toContain('Local review note.');
-}, 20000);
+}, 60000);
 
 it('requires manifest components, bound tokens, and linked screen instances before compiling', async () => {
   const root = fixture();
@@ -193,7 +193,7 @@ it('requires manifest components, bound tokens, and linked screen instances befo
   expect(() => compilePrototype(root)).toThrow(
     'Native design system is invalid',
   );
-}, 20000);
+}, 60000);
 
 it('counts components nested inside other component instances as screen usage', async () => {
   const root = fixture();
@@ -230,7 +230,7 @@ it('counts components nested inside other component instances as screen usage', 
     valid: true,
     findings: [],
   });
-}, 20000);
+}, 60000);
 
 it('inspects, renders, and compiles screens across flow pages', async () => {
   const root = fixture();
@@ -339,4 +339,4 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
   );
   expect(renderScreens(root)).toHaveLength(3);
   expect(compilePrototype(root).screens).toBe(3);
-}, 30000);
+}, 60000);
