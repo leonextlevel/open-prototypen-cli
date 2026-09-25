@@ -39,6 +39,9 @@
         place-items: center;
         background: #0009;
       }
+      .overlay-backdrop .stage:focus {
+        outline: none;
+      }
       .overlay-backdrop .stage {
         box-shadow: 0 12px 60px #0008;
       }
@@ -148,8 +151,11 @@
       }
 
       function draw() {
-        app.replaceChildren(stage(current));
+        const base = stage(current);
+        app.replaceChildren(base);
         if (overlay) {
+          // The overlay is modal: the screen below leaves the tab order and accessibility tree.
+          base.inert = true;
           const backdrop = document.createElement('div');
           backdrop.className = 'overlay-backdrop';
           backdrop.addEventListener('click', (event) => {
@@ -158,11 +164,24 @@
               draw();
             }
           });
-          backdrop.append(stage(overlay));
+          const dialog = stage(overlay);
+          dialog.setAttribute('role', 'dialog');
+          dialog.setAttribute('aria-modal', 'true');
+          dialog.setAttribute('aria-label', data.screens[overlay].title);
+          dialog.tabIndex = -1;
+          backdrop.append(dialog);
           app.append(backdrop);
+          dialog.focus();
         }
         document.body.dataset.screen = current;
+        document.body.dataset.overlay = overlay || '';
       }
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && overlay) {
+          overlay = null;
+          draw();
+        }
+      });
       draw();
     </script>
   </body>

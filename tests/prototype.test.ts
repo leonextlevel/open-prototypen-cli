@@ -14,9 +14,12 @@ import { chromium } from 'playwright-core';
 import { afterEach, expect, it } from 'vitest';
 import { initProject } from '../packages/harness/src/index.js';
 import {
+  evalDocument,
   inspectCanvas,
   relativeBounds,
 } from '../packages/openpencil/src/index.js';
+import { setRefs } from '../packages/openpencil/src/refs.js';
+import { applyDesignSystem } from '../packages/openpencil/src/system.js';
 import {
   compilePrototype,
   renderScreens,
@@ -125,3 +128,99 @@ it('renders a real editable fig and navigates measured hotspots in Chrome', asyn
     }
   }
 }, 20000);
+
+it.skipIf(!existsSync('/usr/bin/google-chrome'))(
+  'makes overlays modal for keyboard and assistive technology',
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'open-prototypen-overlay-'));
+    projects.push(root);
+    initProject(root, 'codex');
+    writeFileSync(
+      join(root, 'docs/design/config.yaml'),
+      'version: 1\nschema: default\nlanguage:\n  mode: auto\n  fallback: en\ndesignEngine: openpencil\n',
+    );
+    mkdirSync(join(root, 'docs/design/design'), { recursive: true });
+    writeFileSync(
+      join(root, 'docs/design/design/system.yaml'),
+      "version: 1\ntokens:\n  - name: color.surface\n    type: COLOR\n    value: '#112233'\ncomponents:\n  - name: Probe\n    states: [default]\n",
+    );
+    await applyDesignSystem(root);
+    evalDocument(
+      root,
+      `
+      const home = figma.createFrame(); home.name = 'home'; home.resize(200, 160);
+      const open = figma.createRectangle(); open.name = 'open'; open.resize(60, 30);
+      home.appendChild(open); open.x = 20; open.y = 20;
+      const sheet = figma.createFrame(); sheet.name = 'sheet'; sheet.resize(200, 80); sheet.x = 300;
+      const close = figma.createRectangle(); close.name = 'close'; close.resize(60, 30);
+      sheet.appendChild(close); close.x = 20; close.y = 20;
+    `,
+      true,
+    );
+    const tree = inspectCanvas(root).tree;
+    const id = (name: string) => {
+      const visit = (nodes: typeof tree): string | undefined =>
+        nodes
+          .map((node) =>
+            node.name === name ? node.id : visit(node.children ?? []),
+          )
+          .find(Boolean);
+      return visit(tree) ?? '';
+    };
+    setRefs(
+      root,
+      ['home', 'open', 'sheet', 'close'].map((ref) => ({ id: id(ref), ref })),
+    );
+    writeFileSync(
+      join(root, 'docs/design/prototype/interactions.yaml'),
+      `version: 1\ninitialScreen: home\nscreens:\n  home:\n    frame: home\n    title: Home\n    content: Home screen.\n    actions:\n      open:\n        node: open\n        label: Open sheet\n        action: open-overlay\n        target: sheet\n  sheet:\n    frame: sheet\n    title: Sheet\n    content: Sheet content.\n    actions:\n      close:\n        node: close\n        label: Close sheet\n        action: close-overlay\n`,
+    );
+    renderScreens(root);
+    const result = compilePrototype(root);
+    const browser = await chromium.launch({
+      executablePath: '/usr/bin/google-chrome',
+      headless: true,
+      args: ['--no-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.goto(pathToFileURL(join(result.output, 'index.html')).href);
+      await page.getByRole('button', { name: 'Open sheet' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Sheet' });
+      await expect.poll(() => dialog.count()).toBe(1);
+      expect(
+        await page.evaluate(() => document.activeElement?.getAttribute('role')),
+      ).toBe('dialog');
+      // Only the overlay's hotspots stay outside an inert subtree.
+      expect(
+        await page.evaluate(() =>
+          [...document.querySelectorAll('button.hotspot')]
+            .filter((button) => !button.closest('[inert]'))
+            .map((button) => button.getAttribute('aria-label')),
+        ),
+      ).toEqual(['Close sheet']);
+      await page.keyboard.press('Tab');
+      expect(
+        await page.evaluate(() =>
+          document.activeElement?.getAttribute('aria-label'),
+        ),
+      ).toBe('Close sheet');
+      await page.keyboard.press('Tab');
+      expect(
+        await page.evaluate(() =>
+          document.activeElement?.getAttribute('aria-label'),
+        ),
+      ).not.toBe('Open sheet');
+      await page.keyboard.press('Escape');
+      await expect
+        .poll(() => page.locator('body').getAttribute('data-overlay'))
+        .toBe('');
+      expect(
+        await page.getByRole('button', { name: 'Open sheet' }).count(),
+      ).toBe(1);
+    } finally {
+      await browser.close();
+    }
+  },
+  30000,
+);

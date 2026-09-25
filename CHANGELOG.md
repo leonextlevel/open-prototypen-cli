@@ -20,6 +20,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - Commands run with `--json` report failures as a JSON `{ "error": ... }` object on stdout, still exiting with status 1.
 - `validate canvas` counts a component used inside another component's instance as used on that screen.
 - The unmeasured-text hint and `text-action` warning appear only for text nodes that still have OpenPencil's 100×100 default size.
+- Prototype overlays are modal: the screen below becomes inert, focus moves into the overlay, and Escape closes it.
 - `inspect screen` names its argument `<screen>`, the screen key from `interactions.yaml`, instead of `<id>`.
 - `render` no longer exports a node that is not a top-level page frame, and it keeps the previous PNG when an export fails its checks.
 - `render` fails when content outside a frame enlarges the PNG, and `prototype` rejects stale renders whose size differs from their frame.
