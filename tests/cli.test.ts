@@ -113,8 +113,13 @@ it('initializes both harnesses and serves artifact contracts through the CLI', (
     refs: [],
     problems: [],
   });
-  expect(cli(root, 'ref', 'set', '0:1=Invalid Ref', '--json').stderr).toContain(
+  const invalidRef = cli(root, 'ref', 'set', '0:1=Invalid Ref', '--json');
+  expect(invalidRef.status).toBe(1);
+  expect(JSON.parse(invalidRef.stdout).error).toContain(
     'expected <node-id>=<ref>',
+  );
+  expect(cli(root, 'ref', 'set', '0:1=Invalid Ref').stderr).toContain(
+    'Error: Invalid assignment',
   );
   expect(
     JSON.parse(cli(root, 'inspect', 'system', '--json').stdout).native

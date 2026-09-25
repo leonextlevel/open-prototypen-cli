@@ -269,8 +269,10 @@ program
   );
 
 program.parseAsync(process.argv).catch((error: unknown) => {
-  console.error(
-    `Error: ${error instanceof Error ? error.message : String(error)}`,
-  );
+  const message = error instanceof Error ? error.message : String(error);
+  // Agents parse stdout when they pass --json, so failures keep the same channel and shape.
+  if (process.argv.includes('--json'))
+    console.log(JSON.stringify({ error: message }, null, 2));
+  else console.error(`Error: ${message}`);
   process.exitCode = 1;
 });

@@ -22,7 +22,7 @@ open-prototypen --project /path/to/product validate brief --json
 
 `init` creates `docs/design/config.yaml` and installs eight skills in `.agents/skills/` for Codex or `.claude/skills/` for Claude. Use `--harness all` for both. Give an agent the installed main skill path and the CLI command when its environment does not discover skills automatically. `update` refreshes unmodified installed skills while preserving local edits.
 
-The agent writes project artifacts under `docs/design/` in the user's language. Structural keys and tool instructions stay in English. `status` reports readiness; `instructions` provides each artifact's contract and template; `validate` checks structure and dependencies. These commands and `inspect` support `--json`. See [workflow principles](docs/workflow.md).
+The agent writes project artifacts under `docs/design/` in the user's language. Structural keys and tool instructions stay in English. `status` reports readiness; `instructions` provides each artifact's contract and template; `validate` checks structure and dependencies. These commands and `inspect` support `--json`; with it, a failure prints `{ "error": "..." }` on stdout and exits with status 1. See [workflow principles](docs/workflow.md).
 
 ## Build a prototype
 

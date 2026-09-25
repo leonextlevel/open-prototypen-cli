@@ -16,6 +16,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 
 ### Fixed
 
+- Commands run with `--json` report failures as a JSON `{ "error": ... }` object on stdout, still exiting with status 1.
 - `inspect screen` names its argument `<screen>`, the screen key from `interactions.yaml`, instead of `<id>`.
 - `render` no longer exports a node that is not a top-level page frame, and it keeps the previous PNG when an export fails its checks.
 - `render` fails when content outside a frame enlarges the PNG, and `prototype` rejects stale renders whose size differs from their frame.
