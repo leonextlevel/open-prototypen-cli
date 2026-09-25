@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="__LANG__">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Prototypen</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #202124;
+        color: white;
+        font: 16px system-ui;
+      }
+      .stage {
+        position: relative;
+      }
+      .stage img {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+      .hotspot {
+        position: absolute;
+        border: 0;
+        background: transparent;
+        cursor: pointer;
+      }
+      .hotspot:focus-visible {
+        outline: 3px solid #1769ff;
+        background: #1769ff44;
+      }
+      .overlay-backdrop {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        background: #0009;
+      }
+      .overlay-backdrop .stage {
+        box-shadow: 0 12px 60px #0008;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: pre-wrap;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script id="prototype-data" type="application/json">
+      __DATA__
+    </script>
+    <script type="module">
+      const data = JSON.parse(
+        document.getElementById('prototype-data').textContent,
+      );
+      const app = document.getElementById('app');
+      const history = [];
+      const state = {};
+      let current = data.initialScreen;
+      let overlay = null;
+
+      function stage(name) {
+        const config = data.screens[name];
+        const root = document.createElement('div');
+        root.className = 'stage';
+        root.style.width =
+          'min(100vw, calc(100vh * ' +
+          config.width / config.height +
+          '), ' +
+          config.width +
+          'px)';
+        root.style.aspectRatio = config.width + '/' + config.height;
+
+        const image = document.createElement('img');
+        image.src = 'screens/' + name + '.png';
+        image.alt = '';
+        root.append(image);
+
+        const accessible = document.createElement('section');
+        accessible.className = 'sr-only';
+        accessible.setAttribute('aria-label', config.title);
+        const heading = document.createElement('h1');
+        heading.textContent = config.title;
+        const content = document.createElement('p');
+        content.textContent = config.content;
+        accessible.append(heading, content);
+        root.append(accessible);
+
+        for (const action of Object.values(config.actions)) {
+          if (action.when && state[action.when.key] !== action.when.value)
+            continue;
+          const button = document.createElement('button');
+          button.className = 'hotspot';
+          button.type = 'button';
+          button.setAttribute('aria-label', action.label);
+          button.style.left = (action.bounds.x / config.width) * 100 + '%';
+          button.style.top = (action.bounds.y / config.height) * 100 + '%';
+          button.style.width = (action.bounds.width / config.width) * 100 + '%';
+          button.style.height =
+            (action.bounds.height / config.height) * 100 + '%';
+          button.addEventListener('click', () => act(action));
+          root.append(button);
+        }
+        return root;
+      }
+
+      function act(action) {
+        switch (action.action) {
+          case 'navigate':
+            history.push(current);
+            current = action.target;
+            overlay = null;
+            break;
+          case 'back':
+            current = history.pop() || data.initialScreen;
+            overlay = null;
+            break;
+          case 'open-overlay':
+            overlay = action.target;
+            break;
+          case 'close-overlay':
+            overlay = null;
+            break;
+          case 'set-state':
+            state[action.key] = action.value;
+            if (action.target) {
+              history.push(current);
+              current = action.target;
+              overlay = null;
+            }
+            break;
+          case 'external-link':
+            window.open(action.url, '_blank', 'noopener,noreferrer');
+            return;
+        }
+        draw();
+      }
+
+      function draw() {
+        app.replaceChildren(stage(current));
+        if (overlay) {
+          const backdrop = document.createElement('div');
+          backdrop.className = 'overlay-backdrop';
+          backdrop.addEventListener('click', (event) => {
+            if (event.target === backdrop) {
+              overlay = null;
+              draw();
+            }
+          });
+          backdrop.append(stage(overlay));
+          app.append(backdrop);
+        }
+        document.body.dataset.screen = current;
+      }
+      draw();
+    </script>
+  </body>
+</html>

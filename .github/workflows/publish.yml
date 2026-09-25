@@ -1,0 +1,38 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - name: Check release metadata
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: node scripts/check-release.mjs "$RELEASE_TAG"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm format:check
+      - run: pnpm test
+      - run: npm pack --dry-run
+      - name: Publish to npm
+        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

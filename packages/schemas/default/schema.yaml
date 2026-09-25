@@ -1,0 +1,104 @@
+name: default
+version: 1
+rules:
+  - Follow the user's language for prose while keeping structural headings and keys in English.
+  - Separate evidence from interpretation and assumptions; never invent metrics.
+  - Preserve existing user content and add context-specific sections when useful.
+artifacts:
+  - id: brief
+    output: brief.md
+    requires: []
+    requiredSections:
+      [Problem, Target Audience, Initial Hypothesis, Open Questions]
+    instructions: Clarify the idea and distinguish known facts from assumptions. Do not formalize prematurely.
+  - id: market-research
+    output: research/market.md
+    requires: [brief]
+    requiredSections: [Context, Existing Alternatives, Evidence, Open Questions]
+    instructions: Research the market using current sources. Separate evidence from interpretation and do not invent metrics.
+  - id: competitor-research
+    output: research/competitors.md
+    requires: [brief]
+    optional: true
+    requiredSections:
+      [Direct Competitors, Indirect Competitors, Evidence, Open Questions]
+    instructions: Compare relevant alternatives with source links and observed facts.
+  - id: product-definition
+    output: product/definition.md
+    requires: [brief, market-research]
+    requiredSections:
+      [
+        Problem,
+        Target Audience,
+        Value Proposition,
+        Core Capabilities,
+        Product Rules,
+        Open Questions,
+      ]
+    instructions: Define the product from evidence, mark assumptions, and preserve unresolved decisions. Do not design UI here.
+  - id: product-decisions
+    output: product/decisions.md
+    requires: [product-definition]
+    optional: true
+    requiredSections: [Decisions, Rationale, Open Questions]
+    instructions: Record significant product tradeoffs and their rationale.
+  - id: ux-research
+    output: research/ux.md
+    requires: [product-definition]
+    requiredSections:
+      [Interaction Patterns, Evidence, Implications, Open Questions]
+    instructions: Research interaction patterns in real products and connect observations to this product.
+  - id: visual-research
+    output: research/visual.md
+    requires: [product-definition]
+    requiredSections: [References, Principles, Avoid, Evidence]
+    instructions: Study contextual visual references. Record each source and access date, concrete observations, a product-specific transferable principle, and what should not be copied.
+  - id: product-flows
+    output: product/flows.md
+    requires: [product-definition]
+    requiredSections:
+      [Actors, Core Flows, Error and Empty States, Open Questions]
+    instructions: Describe key paths, entry points, decisions, success, and failure states.
+  - id: screen-map
+    output: product/screens.md
+    requires: [product-definition, product-flows]
+    requiredSections: [Screens, Navigation, States, Open Questions]
+    instructions: Describe each screen's purpose, actor, primary action, content, states, and next screens.
+  - id: design-direction
+    output: design/direction.md
+    requires: [product-definition, ux-research, visual-research]
+    requiredSections:
+      [
+        Design Intent,
+        Design Principles,
+        Visual Hierarchy,
+        Typography Strategy,
+        Color Strategy,
+        Avoid,
+      ]
+    instructions: Derive a specific visual direction from product context and research. Explain hierarchy, typography, semantic color roles, spatial rhythm, and tradeoffs.
+  - id: design-system
+    output: design/system.md
+    requires: [design-direction]
+    requiredSections:
+      [Tokens, Typography, Colors, Components, States, Accessibility Notes]
+    instructions: Explain the minimum coherent system here. Record token values and component inventory in design/system.yaml, then materialize variables, native components, states, and linked instances in the OpenPencil file.
+  - id: design-decisions
+    output: design/decisions.md
+    requires: [design-direction]
+    optional: true
+    requiredSections: [Decisions, Rationale, Open Questions]
+    instructions: Record consequential design choices and deviations from the direction.
+  - id: audit-report
+    output: audit/report.md
+    requires: [screen-map, design-direction, design-system]
+    requiredSections:
+      [
+        Summary,
+        Critical Findings,
+        UX Findings,
+        Visual Findings,
+        Accessibility Findings,
+        Accepted Exceptions,
+      ]
+    instructions: Review rendered screens and native canvas structure independently. Ground visual, accessibility, and system findings in images, artifacts, or inspected nodes; do not rewrite requirements to justify the design.

@@ -1,0 +1,70 @@
+{
+  "name": "open-prototypen-cli",
+  "version": "0.1.0",
+  "description": "Local-first CLI for agent-led product exploration and editable OpenPencil prototypes",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leonextlevel/open-prototypen-cli.git"
+  },
+  "homepage": "https://github.com/leonextlevel/open-prototypen-cli#readme",
+  "bugs": "https://github.com/leonextlevel/open-prototypen-cli/issues",
+  "keywords": [
+    "cli",
+    "prototype",
+    "design",
+    "openpencil",
+    "agents"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "bin/",
+    "dist/",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "packages/schemas/default/",
+    "runtime/",
+    "skills/",
+    "docs/"
+  ],
+  "type": "module",
+  "bin": {
+    "open-prototypen": "./bin/open-prototypen.mjs"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "pnpm build && vitest run",
+    "lint": "eslint .",
+    "format:check": "prettier --check .",
+    "format": "prettier --write .",
+    "cli": "tsx apps/cli/src/index.ts"
+  },
+  "dependencies": {
+    "@open-pencil/cli": "0.15.1",
+    "@open-pencil/core": "0.15.1",
+    "@open-pencil/scene-graph": "0.15.1",
+    "commander": "^14.0.2",
+    "gray-matter": "^4.0.3",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5",
+    "yaml": "^2.8.1",
+    "zod": "^4.1.9"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^24.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.44.0",
+    "@typescript-eslint/parser": "^8.44.0",
+    "eslint": "^9.36.0",
+    "playwright-core": "^1.58.0",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}
