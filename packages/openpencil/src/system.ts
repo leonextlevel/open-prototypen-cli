@@ -3,6 +3,8 @@ import { dirname, extname, resolve } from 'node:path';
 import { BUILTIN_IO_FORMATS, IORegistry } from '@open-pencil/core/io';
 import { SceneGraph } from '@open-pencil/scene-graph';
 import {
+  hexColor,
+  pageBackground,
   readDesignSystem,
   sameTokenValue,
   tokenValue,
@@ -10,6 +12,8 @@ import {
 import { evalDocument, figPath, inspectCanvas } from './index.js';
 
 export const SYSTEM_COLLECTION = 'Open Prototypen';
+// OpenPencil keeps internal masters on this hidden page; they are not project work.
+export const INTERNAL_PAGE = 'Internal Only Canvas';
 export type NativeVariable = {
   id: string;
   name: string;
@@ -32,6 +36,8 @@ export type NativeSystem = {
   collections: { id: string; name: string; defaultModeId: string }[];
   variables: NativeVariable[];
   nodes: NativeNode[];
+  // Project pages with their background as #RRGGBB, excluding the internal page.
+  pages: { id: string; name: string; background: string | null }[];
 };
 
 async function createBlankDocument(file: string): Promise<void> {
@@ -60,10 +66,28 @@ export function inspectNativeSystem(project: string): NativeSystem {
         parentId: node.parentId, componentId: node.componentId,
         boundVariables: node.boundVariables,
         text: node.type === 'TEXT' ? node.text : undefined
+      })),
+      pages: figma.root.children.map((page) => ({
+        id: page.id, name: page.name, background: page.backgrounds[0]?.color ?? null
       }))
     };`,
-  ) as Omit<NativeSystem, 'document'>;
-  return { document: figPath(project), ...data };
+  ) as Omit<NativeSystem, 'document' | 'pages'> & {
+    pages: {
+      id: string;
+      name: string;
+      background: { r: number; g: number; b: number } | null;
+    }[];
+  };
+  return {
+    document: figPath(project),
+    ...data,
+    pages: data.pages
+      .filter((page) => page.name !== INTERNAL_PAGE)
+      .map((page) => ({
+        ...page,
+        background: page.background ? hexColor(page.background) : null,
+      })),
+  };
 }
 
 export async function applyDesignSystem(project: string): Promise<{
@@ -71,6 +95,9 @@ export async function applyDesignSystem(project: string): Promise<{
   created: string[];
   updated: string[];
   unchanged: string[];
+  pageBackground: string;
+  // Pages whose background was changed to pageBackground.
+  pages: string[];
 }> {
   const system = readDesignSystem(project);
   const file = figPath(project);
@@ -141,7 +168,28 @@ export async function applyDesignSystem(project: string): Promise<{
       true,
     );
   }
-  return { document: file, created, updated, unchanged };
+  const background = pageBackground(system);
+  const pages = before.pages.filter((page) => page.background !== background);
+  if (pages.length)
+    evalDocument(
+      project,
+      `
+      const ids = new Set(${JSON.stringify(pages.map((page) => page.id))});
+      const color = ${JSON.stringify(tokenValue({ name: 'pageBackground', type: 'COLOR', value: background }))};
+      for (const page of figma.root.children)
+        if (ids.has(page.id))
+          page.backgrounds = [{ type: 'SOLID', color, opacity: 1, visible: true, blendMode: 'NORMAL' }];
+      return ids.size;`,
+      true,
+    );
+  return {
+    document: file,
+    created,
+    updated,
+    unchanged,
+    pageBackground: background,
+    pages: pages.map((page) => page.name),
+  };
 }
 
 export function importSvg(

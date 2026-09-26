@@ -1,5 +1,6 @@
 import { loadConfig } from '../../core/src/index.js';
 import {
+  pageBackground,
   readDesignSystem,
   sameTokenValue,
   systemPath,
@@ -7,9 +8,11 @@ import {
 } from '../../core/src/system.js';
 import { figPath } from '../../openpencil/src/index.js';
 import {
+  INTERNAL_PAGE,
   inspectNativeSystem,
   SYSTEM_COLLECTION,
   type NativeNode,
+  type NativeSystem,
 } from '../../openpencil/src/system.js';
 
 export type CanvasFinding = { code: string; message: string };
@@ -63,8 +66,6 @@ function linkedMaster(
 }
 
 export const DESIGN_SYSTEM_PAGE = 'Design System';
-// OpenPencil keeps internal masters on this hidden page; they are not project work.
-const INTERNAL_PAGE = 'Internal Only Canvas';
 
 function pageOf(
   node: NativeNode,
@@ -150,6 +151,18 @@ function insideComponent(
     seen.add(id);
   }
   return false;
+}
+
+function pageBackgroundWarnings(
+  pages: NativeSystem['pages'],
+  expected: string,
+): CanvasFinding[] {
+  return pages
+    .filter((page) => page.background !== expected)
+    .map((page) => ({
+      code: 'page-background',
+      message: `Page ${page.name} has background ${page.background ?? 'none'} instead of ${expected}, which keeps frame edges visible; run open-prototypen system apply`,
+    }));
 }
 
 export function validateCanvas(
@@ -300,6 +313,7 @@ export function validateCanvas(
     warnings: [
       ...masterPageWarnings(components, nodes),
       ...masterLabelWarnings(components, nodes),
+      ...pageBackgroundWarnings(native.pages, pageBackground(system)),
     ],
     summary,
   };
