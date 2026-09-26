@@ -35,7 +35,7 @@ artifacts:
         Product Rules,
         Open Questions,
       ]
-    instructions: Define the product from evidence, mark assumptions, and preserve unresolved decisions. Do not design UI here.
+    instructions: Define the product from evidence, mark assumptions, and preserve unresolved decisions. Give each product rule a stable ID such as R1. Do not design UI here.
   - id: product-decisions
     output: product/decisions.md
     requires: [product-definition]
@@ -63,7 +63,7 @@ artifacts:
     output: product/screens.md
     requires: [product-definition, product-flows]
     requiredSections: [Screens, Navigation, States, Open Questions]
-    instructions: Describe each screen's purpose, actor, primary action, content, states, and next screens.
+    instructions: Describe each screen's purpose, actor, primary action, content, states, and next screens. Map every state with a distinct visual response to its own screen key (lowercase letters, digits, and hyphens) and how it is reached. Optionally add a Rule Coverage table that marks each product rule as demonstrable in the prototype or information only, with a reason.
   - id: design-direction
     output: design/direction.md
     requires: [product-definition, ux-research, visual-research]

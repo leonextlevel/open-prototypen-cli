@@ -28,7 +28,7 @@ TODO: Replace with researched or reasoned content.
 
 ## Product Rules
 
-TODO: Replace with researched or reasoned content.
+TODO: List each product rule with a stable ID, such as "R1: A customer has at most one active order per day", so the screen map and audit can refer to it.
 
 ## Open Questions
 

@@ -24,8 +24,8 @@ function put(projectPath: string, id: string, complete = true) {
   writeFileSync(
     path,
     complete
-      ? templateFor(id).replaceAll(
-          'TODO: Replace with researched or reasoned content.',
+      ? templateFor(id).replace(
+          /^TODO: (?!Optional).*$/gm,
           'Conteúdo fundamentado para esta seção.',
         )
       : templateFor(id),
@@ -68,6 +68,22 @@ describe('artifact workflow', () => {
       status(root).find((item) => item.artifact === 'product-definition')
         ?.state,
     ).toBe('invalid');
+  });
+
+  it('requires a filled state table in the screen map but not rule coverage', () => {
+    const root = project();
+    const template = templateFor('screen-map');
+    expect(template).toContain('Screen key');
+    expect(template).toContain('## Rule Coverage');
+    put(root, 'screen-map', false);
+    expect(
+      validateArtifact(root, 'screen-map', false).findings.map(
+        (finding) => finding.message,
+      ),
+    ).toContain('Empty section: States');
+    put(root, 'screen-map');
+    expect(validateArtifact(root, 'screen-map', false).findings).toEqual([]);
+    expect(templateFor('product-definition')).toMatch(/stable ID/);
   });
 
   it('accepts audit reports with and without the optional tables', () => {
