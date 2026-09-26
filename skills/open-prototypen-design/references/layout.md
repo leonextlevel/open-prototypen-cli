@@ -16,7 +16,7 @@ Read this when setting up a screen's structure, choosing spacing and density, gr
 ## Spacing
 
 - **Default.** Choose a spacing scale that expresses relationships: inside a control, between an icon and its label, between related fields, between repeated items, between sections, between unrelated regions, and at page margins. The values are the project's own; what matters is that each relationship always gets the same step.
-- **Constraint.** Declare the scale as `space/*` tokens in `system.yaml` and bind them in masters and shared structures, such as the padding and `itemSpacing` of auto-layout frames; `validate canvas` warns about tokens that stay unbound or bound only to samples.
+- **Constraint.** Declare the scale as `space/*` tokens in `system.yaml` and bind them in masters and shared structures, such as the padding and `itemSpacing` of auto-layout frames; `validate canvas` warns about tokens that stay unbound or bound only to samples. Declare `scales: { spacing: space/, radius: radius/ }` in `system.yaml` to have `validate canvas` warn `off-scale-spacing` and `off-scale-radius` about unbound gaps, paddings, and corner radii in screens and masters that no token of the scale contains, grouped by value. Accept a deliberate optical adjustment as one exception in the audit instead of forcing it onto the scale; absolute positions are not checked.
 - **Heuristic.** Use auto-layout with bound spacing for component masters and repeated lists, and give text inside it explicit sizes, because headless OpenPencil does not measure text. Absolute placement stays the fallback for text-heavy screen groups; see [the headless reference](openpencil-headless.md).
 
 ## Hierarchy and composition

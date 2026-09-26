@@ -1059,6 +1059,66 @@ it('warns about low text contrast on screens and masters, including bound fills'
   expect(result.summary.textContrast).toEqual({ checked: 8, unchecked: 2 });
 }, 60000);
 
+it('warns about unbound spacing and radius values outside declared scales', async () => {
+  const root = fixture();
+  const floats = (entries: [string, number][]) =>
+    entries
+      .map(
+        ([name, value]) =>
+          `  - name: ${name}\n    type: FLOAT\n    value: ${value}\n`,
+      )
+      .join('');
+  const base = readFileSync(systemPath(root), 'utf8').replace(
+    'tokens:\n',
+    `tokens:\n${floats([
+      ['space.sm', 8],
+      ['space.lg', 16],
+      ['radius.sm', 6],
+      ['radius.lg', 12],
+    ])}`,
+  );
+  const scales = 'scales:\n  spacing: space.\n  radius: radius.\n';
+  writeFileSync(systemPath(root), base + scales);
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const screen = figma.createFrame(); screen.name = 'screen'; screen.resize(600, 400);
+    const auto = (name, gap, padding = 8) => {
+      const frame = figma.createFrame(); frame.name = name; frame.layoutMode = 'VERTICAL';
+      frame.itemSpacing = gap;
+      frame.paddingTop = frame.paddingRight = frame.paddingBottom = frame.paddingLeft = padding;
+      screen.appendChild(frame);
+      return frame;
+    };
+    auto('list-a', 13); auto('list-b', 13); auto('roomy', 16, 16);
+    const bound = auto('bound', 7);
+    figma.bindVariable(bound.id, 'itemSpacing', figma.getLocalVariables().find((item) => item.name === 'space.md').id);
+    const loose = figma.createFrame(); loose.name = 'loose'; loose.itemSpacing = 13; screen.appendChild(loose);
+    for (const [name, radius] of [['odd', 10], ['even', 6]]) {
+      const shape = figma.createRectangle(); shape.name = name; shape.cornerRadius = radius; screen.appendChild(shape);
+    }
+    const stray = figma.createRectangle(); stray.name = 'stray'; stray.cornerRadius = 10; stray.x = 2000;
+  `,
+    true,
+  );
+  const frame = inspectCanvas(root).tree.find((node) => node.name === 'screen');
+  const offScale = () =>
+    validateCanvas(root, { home: frame?.id ?? '' })
+      .warnings.filter((warning) => warning.code.startsWith('off-scale'))
+      .map((warning) => warning.message.split('. Bind')[0]);
+  expect(offScale()).toEqual([
+    'gap 13 is not in the spacing scale (8, 12, 16) on 2 nodes: list-a, list-b',
+    'radius 10 is not in the radius scale (6, 12) on 1 node: odd',
+  ]);
+  writeFileSync(systemPath(root), base);
+  expect(offScale()).toEqual([]);
+  writeFileSync(systemPath(root), base + 'scales:\n  radius: corner.\n');
+  expect(() => readDesignSystem(root)).toThrow(
+    'Scale radius prefix corner. matches no FLOAT token',
+  );
+}, 60000);
+
 it('chooses a neutral page background slightly apart from every token color', () => {
   const root = fixture();
   const system = (colors: string[], extra = '') => {

@@ -5,6 +5,7 @@ import {
   hexColor,
   pageBackground,
   readDesignSystem,
+  scaleValues,
   type DesignSystem,
   type DesignToken,
   sameTokenValue,
@@ -179,6 +180,87 @@ function insideComponent(
     seen.add(id);
   }
   return false;
+}
+
+// Unbound gaps, paddings, and corner radii in screens and masters that no declared scale contains,
+// grouped by value so an intentional exception reads as one line.
+function offScaleWarnings(
+  system: DesignSystem,
+  screenFrames: Record<string, string>,
+  components: NativeNode[],
+  nodes: Map<string, NativeNode>,
+): CanvasFinding[] {
+  const roots = new Set([
+    ...Object.values(screenFrames),
+    ...components
+      .filter((node) => pageOf(node, nodes)?.name !== INTERNAL_PAGE)
+      .map((node) => node.id),
+  ]);
+  const inScope = (node: NativeNode) =>
+    roots.has(node.id) ||
+    [...roots].some((root) => descendsFrom(node, root, nodes));
+  const checks = [
+    {
+      scale: 'spacing' as const,
+      code: 'off-scale-spacing',
+      values: (node: NativeNode) =>
+        node.layoutMode && node.layoutMode !== 'NONE' && node.padding
+          ? [
+              ['gap', 'itemSpacing', node.itemSpacing],
+              ['padding', 'paddingTop', node.padding.top],
+              ['padding', 'paddingRight', node.padding.right],
+              ['padding', 'paddingBottom', node.padding.bottom],
+              ['padding', 'paddingLeft', node.padding.left],
+            ]
+          : [],
+    },
+    {
+      scale: 'radius' as const,
+      code: 'off-scale-radius',
+      values: (node: NativeNode) =>
+        node.radius
+          ? [
+              ['radius', 'topLeftRadius', node.radius.topLeft],
+              ['radius', 'topRightRadius', node.radius.topRight],
+              ['radius', 'bottomRightRadius', node.radius.bottomRight],
+              ['radius', 'bottomLeftRadius', node.radius.bottomLeft],
+            ]
+          : [],
+    },
+  ];
+  const warnings: CanvasFinding[] = [];
+  for (const check of checks) {
+    const scale = scaleValues(system, check.scale);
+    if (!scale) continue;
+    const groups = new Map<string, Set<string>>();
+    for (const node of nodes.values()) {
+      if (!inScope(node)) continue;
+      const bound = node.boundVariables ?? {};
+      for (const [label, field, value] of check.values(node) as [
+        string,
+        string,
+        number | undefined,
+      ][]) {
+        const radiusBound =
+          field.endsWith('Radius') && bound.cornerRadius !== undefined;
+        if (
+          !value ||
+          bound[field] !== undefined ||
+          radiusBound ||
+          scale.some((step) => Math.abs(step - value) < 0.01)
+        )
+          continue;
+        const key = `${label} ${Math.round(value * 100) / 100}`;
+        groups.set(key, (groups.get(key) ?? new Set()).add(node.name));
+      }
+    }
+    for (const [key, names] of groups)
+      warnings.push({
+        code: check.code,
+        message: `${key} is not in the ${check.scale} scale (${[...scale].sort((a, b) => a - b).join(', ')}) on ${names.size} ${names.size === 1 ? 'node' : 'nodes'}: ${[...names].slice(0, 5).join(', ')}${names.size > 5 ? ', …' : ''}. Bind a scale token, or accept it as an intentional adjustment`,
+      });
+  }
+  return warnings;
 }
 
 // WCAG 2.2 treats text of at least 24 px, or 18.66 px when bold, as large.
@@ -557,6 +639,7 @@ export function validateCanvas(
     findings,
     warnings: [
       ...contrastWarnings(system),
+      ...offScaleWarnings(system, screenFrames, components, nodes),
       ...textContrastWarnings(
         project,
         screenFrames,
