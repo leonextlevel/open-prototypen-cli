@@ -206,12 +206,24 @@ function componentUsageWarnings(
       });
     }
   }
-  for (const master of components)
-    if (!used.has(master.id) && pageOf(master, nodes)?.name !== INTERNAL_PAGE)
+  const declared = new Set(
+    system.components.flatMap((entry) =>
+      entry.states.map((state) => `${entry.name}/${state}`),
+    ),
+  );
+  for (const master of components) {
+    if (pageOf(master, nodes)?.name === INTERNAL_PAGE) continue;
+    if (!declared.has(master.name))
+      warnings.push({
+        code: 'component-undeclared',
+        message: `Component master ${master.name} is not a <name>/<state> declared in system.yaml; declare it or remove the master`,
+      });
+    if (!used.has(master.id))
       warnings.push({
         code: 'component-unused',
         message: `Component master ${master.name} has no linked instance`,
       });
+  }
   return warnings;
 }
 

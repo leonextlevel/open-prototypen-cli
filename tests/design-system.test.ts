@@ -452,6 +452,35 @@ it('accepts namespaced component names and keeps states unambiguous', async () =
   }
 }, 60000);
 
+it('warns about masters that the contract does not declare', async () => {
+  const root = fixture();
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'components:',
+      'components:\n  - name: icon/check\n    states: [16-muted]',
+    ),
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    for (const name of ['BookRow/default', 'icon/check/16-muted', 'Badge/default', 'icon/check/24-accent', 'BookRow'])
+      figma.createComponent().name = name;
+  `,
+    true,
+  );
+  expect(
+    validateCanvas(root, {})
+      .warnings.filter((warning) => warning.code === 'component-undeclared')
+      .map((warning) => warning.message.split(' is ')[0]),
+  ).toEqual([
+    'Component master Badge/default',
+    'Component master icon/check/24-accent',
+    'Component master BookRow',
+  ]);
+}, 60000);
+
 it('warns about instances on undeclared screens and unused masters', async () => {
   const root = fixture();
   writeFileSync(
