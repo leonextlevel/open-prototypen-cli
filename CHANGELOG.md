@@ -35,6 +35,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `validate canvas` warns `text-contrast` about text in screens and masters below the WCAG 2.2 thresholds, including text whose fill is bound to a variable, and counts text whose background it cannot determine as unchecked. ([#47](https://github.com/leonextlevel/open-prototypen-cli/issues/47))
 - `system.yaml` accepts optional `scales` for spacing and radius token prefixes, and `validate canvas` warns `off-scale-spacing` and `off-scale-radius` about unbound gaps, paddings, and radii in screens and masters outside them, grouped by value. ([#48](https://github.com/leonextlevel/open-prototypen-cli/issues/48))
 - The design skill has references on iconography and imagery, data visualization, and motion, each read only when a product uses them. ([#49](https://github.com/leonextlevel/open-prototypen-cli/issues/49))
+- The design skill has an OpenPencil MCP reference for authoring through the desktop app when it has the project's `.fig` open, with the save-and-reopen hand-off between the app and the CLI and safety defaults, and falls back to headless editing otherwise; the README documents the optional setup. ([#50](https://github.com/leonextlevel/open-prototypen-cli/issues/50))
 
 ### Changed
 
