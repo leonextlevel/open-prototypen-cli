@@ -214,9 +214,15 @@ program
   .command('system')
   .description('Manage the native OpenPencil design system')
   .command('apply')
+  .option(
+    '--prune',
+    'Delete native variables that system.yaml does not declare',
+  )
+  .option('--force', 'With --prune, also delete variables bound to nodes')
   .option('--json', 'Machine-readable JSON')
-  .action(async (options: { json?: boolean }) =>
-    output(await applyDesignSystem(root()), options.json),
+  .action(
+    async (options: { prune?: boolean; force?: boolean; json?: boolean }) =>
+      output(await applyDesignSystem(root(), options), options.json),
   );
 program
   .command('svg')

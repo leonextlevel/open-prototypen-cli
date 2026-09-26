@@ -100,6 +100,82 @@ it('creates and synchronizes native variables without replacing unrelated work',
   expect(after.nodes.some((node) => node.name === 'User work')).toBe(true);
 }, 60000);
 
+it('reports and prunes native variables that system.yaml no longer declares', async () => {
+  const root = fixture();
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'tokens:',
+      "tokens:\n  - name: color.scrim\n    type: COLOR\n    value: '#00000080'\n  - name: color.accent\n    type: COLOR\n    value: '#aa3300'",
+    ),
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const accent = figma.getLocalVariables().find((item) => item.name === 'color.accent');
+    const box = figma.createRectangle(); box.name = 'accent-box'; box.resize(20, 20);
+    box.fills = [{ type: 'SOLID', color: { r: 0.6, g: 0.2, b: 0, a: 1 }, opacity: 1 }];
+    figma.bindVariable(box.id, 'fills/0/color', accent.id);
+  `,
+    true,
+  );
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      /  - name: color\.scrim[\s\S]*?'#aa3300'\n/,
+      '',
+    ),
+  );
+  const report = await applyDesignSystem(root);
+  expect(report.extra).toEqual(['color.scrim', 'color.accent']);
+  expect(report.pruned).toEqual([]);
+  expect(
+    validateCanvas(root, {})
+      .warnings.filter((warning) => warning.code === 'token-undeclared')
+      .map((warning) => warning.message),
+  ).toEqual([
+    expect.stringContaining('color.scrim is not in system.yaml'),
+    expect.stringContaining('color.accent is not in system.yaml'),
+  ]);
+  await expect(applyDesignSystem(root, { prune: true })).rejects.toThrow(
+    'Cannot prune bound variables: color.accent (1 nodes)',
+  );
+  expect(
+    inspectNativeSystem(root).variables.map((variable) => variable.name),
+  ).toContain('color.scrim');
+  const forced = await applyDesignSystem(root, { prune: true, force: true });
+  expect(forced.pruned).toEqual(['color.scrim', 'color.accent']);
+  const after = inspectNativeSystem(root);
+  expect(after.variables.map((variable) => variable.name)).toEqual([
+    'color.surface',
+    'space.md',
+  ]);
+  expect(
+    after.nodes.find((node) => node.name === 'accent-box')?.boundVariables,
+  ).toEqual({});
+  expect((await applyDesignSystem(root, { prune: true })).extra).toEqual([]);
+}, 60000);
+
+it('prunes an unbound variable without --force', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      /  - name: space\.md[\s\S]*?value: 12\n/,
+      '',
+    ),
+  );
+  expect(await applyDesignSystem(root, { prune: true })).toMatchObject({
+    extra: ['space.md'],
+    pruned: ['space.md'],
+  });
+  expect(
+    inspectNativeSystem(root).variables.map((variable) => variable.name),
+  ).toEqual(['color.surface']);
+}, 60000);
+
 it('imports an SVG as editable vectors and preserves changed installed references', async () => {
   const root = fixture();
   await applyDesignSystem(root);

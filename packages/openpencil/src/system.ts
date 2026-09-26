@@ -90,11 +90,18 @@ export function inspectNativeSystem(project: string): NativeSystem {
   };
 }
 
-export async function applyDesignSystem(project: string): Promise<{
+// Deleting a bound variable unbinds its nodes and leaves their literal values behind.
+export async function applyDesignSystem(
+  project: string,
+  options: { prune?: boolean; force?: boolean } = {},
+): Promise<{
   document: string;
   created: string[];
   updated: string[];
   unchanged: string[];
+  // Variables in the collection that system.yaml does not declare.
+  extra: string[];
+  pruned: string[];
   pageBackground: string;
   // Pages whose background was changed to pageBackground.
   pages: string[];
@@ -127,6 +134,23 @@ export async function applyDesignSystem(project: string): Promise<{
     else if (!sameTokenValue(existing.value, token.value))
       updated.push(token.name);
     else unchanged.push(token.name);
+  }
+  const declared = new Set(values.map((token) => token.name));
+  const extras = known.filter((item) => !declared.has(item.name));
+  const pruned = options.prune ? extras : [];
+  if (pruned.length && !options.force) {
+    const bound = pruned
+      .map((variable) => ({
+        name: variable.name,
+        nodes: before.nodes.filter((node) =>
+          Object.values(node.boundVariables ?? {}).includes(variable.id),
+        ).length,
+      }))
+      .filter((variable) => variable.nodes > 0);
+    if (bound.length)
+      throw new Error(
+        `Cannot prune bound variables: ${bound.map((variable) => `${variable.name} (${variable.nodes} nodes)`).join(', ')}. Rebind those nodes to declared tokens, or pass --force to unbind them and keep their literal values.`,
+      );
   }
   if (created.length || updated.length || !collection) {
     evalDocument(
@@ -168,6 +192,26 @@ export async function applyDesignSystem(project: string): Promise<{
       true,
     );
   }
+  if (pruned.length)
+    evalDocument(
+      project,
+      `
+      const ids = new Set(${JSON.stringify(pruned.map((variable) => variable.id))});
+      const graph = figma.graph;
+      // The .fig writer also keeps each node's bindings in plugin data and rewrites it only
+      // while a binding remains, so drop that copy along with the binding.
+      for (const node of graph.getAllNodes()) {
+        const bindings = Object.entries(node.boundVariables ?? {});
+        if (!bindings.some(([, id]) => ids.has(id))) continue;
+        graph.updateNode(node.id, {
+          boundVariables: Object.fromEntries(bindings.filter(([, id]) => !ids.has(id))),
+          pluginData: node.pluginData.filter((entry) => !(entry.pluginId === 'open-pencil' && entry.key === 'boundVariables')),
+        });
+      }
+      for (const id of ids) graph.removeVariable(id);
+      return ids.size;`,
+      true,
+    );
   const background = pageBackground(system);
   const pages = before.pages.filter((page) => page.background !== background);
   if (pages.length)
@@ -187,6 +231,8 @@ export async function applyDesignSystem(project: string): Promise<{
     created,
     updated,
     unchanged,
+    extra: extras.map((variable) => variable.name),
+    pruned: pruned.map((variable) => variable.name),
     pageBackground: background,
     pages: pages.map((page) => page.name),
   };
