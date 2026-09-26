@@ -70,6 +70,28 @@ describe('artifact workflow', () => {
     ).toBe('invalid');
   });
 
+  it('accepts audit reports with and without the optional tables', () => {
+    const root = project();
+    const path = artifactPath(root, 'audit-report');
+    mkdirSync(join(path, '..'), { recursive: true });
+    const report = templateFor('audit-report').replace(
+      /^TODO: (?!Optional).*$/gm,
+      'Achado fundamentado nesta seção.',
+    );
+    expect(report).toContain('## Error Recovery');
+    expect(report).toContain('## Resolution');
+    writeFileSync(path, report);
+    expect(validateArtifact(root, 'audit-report', false).findings).toEqual([]);
+    writeFileSync(
+      path,
+      report
+        .replace(/\n## Error Recovery\n[\s\S]*?(?=\n## )/, '')
+        .replace(/\n## Resolution\n[\s\S]*$/, '\n'),
+    );
+    expect(readFileSync(path, 'utf8')).not.toContain('## Resolution');
+    expect(validateArtifact(root, 'audit-report', false).findings).toEqual([]);
+  });
+
   it('preserves a locally edited installed skill during update', () => {
     const root = project();
     const path = join(root, '.agents/skills/open-prototypen/SKILL.md');

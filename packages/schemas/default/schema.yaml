@@ -101,4 +101,4 @@ artifacts:
         Accessibility Findings,
         Accepted Exceptions,
       ]
-    instructions: Review rendered screens and native canvas structure independently. Ground visual, accessibility, and system findings in images, artifacts, or inspected nodes; do not rewrite requirements to justify the design.
+    instructions: Review rendered screens and native canvas structure independently. Ground visual, accessibility, and system findings in images, artifacts, or inspected nodes; do not rewrite requirements to justify the design. Fill the optional Error Recovery table by walking every error, conflict, and deadline state in the compiled prototype. Refine records decisions and verification in the optional Resolution table.
