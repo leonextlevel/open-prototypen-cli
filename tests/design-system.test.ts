@@ -199,7 +199,7 @@ it('imports an SVG as editable vectors and preserves changed installed reference
   expect(() => importSvg(root, svg, 'book-icon')).toThrow('already exists');
   const reference = join(
     root,
-    '.agents/skills/open-prototypen-design/references/visual-system.md',
+    '.agents/skills/open-prototypen-design/references/design-system.md',
   );
   const review = join(
     root,
@@ -215,7 +215,7 @@ it('imports an SVG as editable vectors and preserves changed installed reference
   );
   const updated = installSkills(root, 'codex', true);
   expect(updated.modified).toContain(
-    'codex/open-prototypen-design/references/visual-system.md',
+    'codex/open-prototypen-design/references/design-system.md',
   );
   expect(updated.modified).toContain('codex/open-prototypen-component-review');
   expect(readFileSync(reference, 'utf8')).toContain('Local observation.');

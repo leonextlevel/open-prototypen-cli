@@ -7,7 +7,13 @@ metadata:
 
 # Design
 
-Read product definition, screen map, UX research, visual research, and the artifact instructions. If visual references do not yet explain their relevance to this product, improve that research first. Derive specific principles before drawing. Avoid default card grids, arbitrary gradients, fake metrics, and decoration without a product reason. Read [the visual system reference](references/visual-system.md) when deciding the foundations, inventory, states, icons, and review criteria.
+Read product definition, screen map, UX research, visual research, and the artifact instructions. If visual references do not yet explain their relevance to this product, improve that research first. Derive specific principles before drawing, and justify every generic pattern by the product, as [intentional design](references/intentional-design.md) explains.
+
+Read a reference only when the decision in front of you needs it:
+
+- [Intentional design](references/intentional-design.md): before writing the direction, and whenever a choice feels like a default.
+- [Design system contract and page](references/design-system.md): when writing `system.yaml`, building the `Design System` page, choosing components and states, or importing icons.
+- [Headless OpenPencil](references/openpencil-headless.md): before scripting edits to the `.fig`.
 
 Explain the direction in `docs/design/design/direction.md` and the system rationale in `docs/design/design/system.md`. Record actual token values and the component inventory in `docs/design/design/system.yaml`, using the contract in the reference. Identify components and necessary states from the screen map before composing screens. Validate the Markdown artifacts, then run `open-prototypen system apply`. It creates `docs/design/prototype/prototype.fig` if absent, synchronizes native variables, and gives every page a neutral background slightly apart from all token colors so frame edges stay visible. Pages created later keep OpenPencil's default background until the next `system apply`; run it again after adding pages, when `validate canvas` warns `page-background`. Bind the variables to relevant node properties; a variable existing unused is not enough. After removing or renaming a token, rebind its nodes to the declared tokens and run `open-prototypen system apply --prune` to delete the old variable; `validate canvas` warns `token-undeclared` until you do.
 

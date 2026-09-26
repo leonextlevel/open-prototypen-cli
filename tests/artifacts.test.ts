@@ -1,4 +1,6 @@
+import { createHash } from 'node:crypto';
 import {
+  existsSync,
   mkdtempSync,
   mkdirSync,
   readFileSync,
@@ -144,6 +146,41 @@ describe('artifact workflow', () => {
     );
     expect(readFileSync(path, 'utf8')).not.toContain('## Resolution');
     expect(validateArtifact(root, 'audit-report', false).findings).toEqual([]);
+  });
+
+  it('installs design references and removes retired ones unless edited', () => {
+    const root = project();
+    const references = join(
+      root,
+      '.agents/skills/open-prototypen-design/references',
+    );
+    for (const file of ['intentional-design.md', 'design-system.md'])
+      expect(readFileSync(join(references, file), 'utf8')).toContain(
+        '## Sources',
+      );
+    // Simulate files a previous version installed and this one no longer ships.
+    const manifestPath = join(root, 'docs/design/.installation.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const digest = (value: string) =>
+      createHash('sha256').update(value).digest('hex');
+    writeFileSync(join(references, 'retired.md'), 'Old reference.\n');
+    writeFileSync(join(references, 'edited.md'), 'Local notes.\n');
+    manifest.skills['codex/open-prototypen-design/references/retired.md'] =
+      digest('Old reference.\n');
+    manifest.skills['codex/open-prototypen-design/references/edited.md'] =
+      digest('Shipped text.\n');
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    const result = installSkills(root, 'codex', true);
+    expect(result.removed).toEqual([
+      'codex/open-prototypen-design/references/retired.md',
+    ]);
+    expect(result.modified).toEqual([
+      'codex/open-prototypen-design/references/edited.md',
+    ]);
+    expect(existsSync(join(references, 'retired.md'))).toBe(false);
+    expect(readFileSync(join(references, 'edited.md'), 'utf8')).toBe(
+      'Local notes.\n',
+    );
   });
 
   it('preserves a locally edited installed skill during update', () => {
