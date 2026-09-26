@@ -6,7 +6,7 @@ Read this when writing `design/system.yaml`, building the `Design System` page, 
 
 - **Default.** Define semantic color roles and build them from tonal scales, as [the color reference](color.md) explains, and check real foreground and background pairs in rendered screens.
 - **Default.** Define a role-based type scale, as [the typography reference](typography.md) explains: family, weight, size, and line height per role, checked with long labels and real content. Verify that the families and weights appear in a render before committing to them: add the font files under `docs/design/assets/fonts/<Family>/<Style>.ttf` and resolve every `font-substitution` warning, as [the headless reference](openpencil-headless.md) explains.
-- **Default.** Define a spacing rhythm and alignment rules. Pick values for relationships (inside a control, between related content, between sections) and use them consistently. Use OpenPencil auto-layout where it keeps repeated content editable.
+- **Default.** Define a spacing scale, alignment rules, and, where the direction needs them, radius and elevation scales, as [the layout reference](layout.md) explains.
 
 ## The contract
 
@@ -41,7 +41,7 @@ components:
 ## The Design System page
 
 - **Constraint.** Place every native component master and state from the contract on a page named `Design System`, grouped by component family under short headings, without text that repeats a master's name.
-- **Default.** Add visible color, typography, and spacing samples labeled with the token name and value, bound to their variables. Export the page with `open-prototypen render --system` and inspect it.
+- **Default.** Add visible color, typography, and spacing samples, and radius and elevation samples when the system defines them, labeled with the token name and value and bound to their variables. Export the page with `open-prototypen render --system` and inspect it.
 
 ## Components and states
 
