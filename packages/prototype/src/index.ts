@@ -337,6 +337,7 @@ function resolveScreen(
     targets.push({ name: actionName, action: runtime });
   }
   warnings.push(...coveredActionWarnings(name, targets));
+  warnings.push(...smallTargetWarnings(name, targets));
   return {
     frame: frame.node,
     bounds: frame.bounds,
@@ -349,6 +350,75 @@ function resolveScreen(
       },
     }),
   };
+}
+// WCAG 2.2 SC 2.5.8 asks for 24×24 CSS px targets, unless a 24 px circle centered on an undersized
+// target meets no other target and no other undersized target's circle. Actions sharing a node form
+// one hotspot; two hotspots conflict only when some of their actions can be active together.
+const MINIMUM_TARGET = 24;
+function smallTargetWarnings(
+  screen: string,
+  targets: { name: string; action: RuntimeAction }[],
+): PrototypeWarning[] {
+  const groups = new Map<string, { name: string; action: RuntimeAction }[]>();
+  for (const target of targets)
+    groups.set(target.action.slot, [
+      ...(groups.get(target.action.slot) ?? []),
+      target,
+    ]);
+  const hotspots = [...groups.values()].map((group) => ({
+    name: group[0]?.name ?? '',
+    bounds: (group[0] as { action: RuntimeAction }).action.bounds,
+    actions: group.map((target) => target.action),
+  }));
+  const small = (bounds: Bounds) =>
+    bounds.width < MINIMUM_TARGET || bounds.height < MINIMUM_TARGET;
+  const center = (bounds: Bounds) => ({
+    x: bounds.x + bounds.width / 2,
+    y: bounds.y + bounds.height / 2,
+  });
+  const radius = MINIMUM_TARGET / 2;
+  const exclusive = (a: RuntimeAction, b: RuntimeAction) =>
+    !!a.when &&
+    !!b.when &&
+    a.when.key === b.when.key &&
+    a.when.value !== b.when.value;
+  const together = (
+    a: (typeof hotspots)[number],
+    b: (typeof hotspots)[number],
+  ) =>
+    a.actions.some((first) =>
+      b.actions.some((second) => !exclusive(first, second)),
+    );
+  // The distance from a point to the nearest point of a rectangle.
+  const distance = (point: { x: number; y: number }, bounds: Bounds) =>
+    Math.hypot(
+      Math.max(bounds.x - point.x, 0, point.x - (bounds.x + bounds.width)),
+      Math.max(bounds.y - point.y, 0, point.y - (bounds.y + bounds.height)),
+    );
+  return hotspots.flatMap((hotspot) => {
+    if (!small(hotspot.bounds)) return [];
+    const origin = center(hotspot.bounds);
+    const crowded = hotspots.some(
+      (other) =>
+        other !== hotspot &&
+        together(hotspot, other) &&
+        (distance(origin, other.bounds) < radius ||
+          (small(other.bounds) &&
+            Math.hypot(
+              center(other.bounds).x - origin.x,
+              center(other.bounds).y - origin.y,
+            ) <
+              2 * radius)),
+    );
+    if (!crowded) return [];
+    const { width, height } = hotspot.bounds;
+    return [
+      {
+        code: 'small-target',
+        message: `Action ${screen}.${hotspot.name}: hotspot ${width}×${height} is smaller than the 24×24 minimum (WCAG 2.5.8) and too close to another target for the spacing exception. Enlarge it with a transparent hit area, move it apart, or accept it in the audit if an inline, equivalent, or essential exception applies.`,
+      },
+    ];
+  });
 }
 // The runtime renders only the last active action on each node, so a later action on the same node wins.
 // An earlier action is dead when that later one is active in every state where it is active.
