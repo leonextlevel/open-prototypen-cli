@@ -246,6 +246,13 @@ export function validateCanvas(
         message: `Native variable is not bound to a node: ${token.name}`,
       });
   }
+  const declared = new Set(system.tokens.map((token) => token.name));
+  const undeclared = variables
+    .filter((variable) => !declared.has(variable.name))
+    .map((variable) => ({
+      code: 'token-undeclared',
+      message: `Native variable ${variable.name} is not in system.yaml; declare it or run open-prototypen system apply --prune`,
+    }));
   const nodes = new Map(native.nodes.map((node) => [node.id, node]));
   const components = native.nodes.filter((node) => node.type === 'COMPONENT');
   const instances = native.nodes.filter((node) => node.type === 'INSTANCE');
@@ -311,6 +318,7 @@ export function validateCanvas(
     valid: findings.length === 0,
     findings,
     warnings: [
+      ...undeclared,
       ...masterPageWarnings(components, nodes),
       ...masterLabelWarnings(components, nodes),
       ...pageBackgroundWarnings(native.pages, pageBackground(system)),
