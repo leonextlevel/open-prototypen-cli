@@ -19,7 +19,14 @@ it('resolves every relative link between skills and references', () => {
     [...readFileSync(file, 'utf8').matchAll(/\]\(([^)#\s]+)(?:#[^)]*)?\)/g)]
       .map((match) => match[1] ?? '')
       .filter((link) => !/^[a-z]+:/.test(link))
-      .filter((link) => !existsSync(resolve(dirname(file), link)))
+      // Skills are installed without the rest of the package, so links must stay inside skills/.
+      .filter((link) => {
+        const target = resolve(dirname(file), link);
+        return (
+          !existsSync(target) ||
+          !target.startsWith(join(packageRoot(), 'skills') + '/')
+        );
+      })
       .map((link) => `${file}: ${link}`),
   );
   expect(broken).toEqual([]);
