@@ -8,7 +8,11 @@ import {
   systemPath,
   tokenValue,
 } from '../../core/src/system.js';
-import { figPath } from '../../openpencil/src/index.js';
+import {
+  figPath,
+  fontWarning,
+  missingFonts,
+} from '../../openpencil/src/index.js';
 import {
   INTERNAL_PAGE,
   inspectNativeSystem,
@@ -487,6 +491,10 @@ export function validateCanvas(
     findings,
     warnings: [
       ...sampleWarnings,
+      ...missingFonts(project).map(({ family, style, nodes: users }) => ({
+        code: 'font-substitution',
+        message: `${fontWarning(family, style)}. Used by: ${users.join(', ')}`,
+      })),
       ...undeclared,
       ...masterPageWarnings(components, nodes),
       ...masterLabelWarnings(components, nodes),

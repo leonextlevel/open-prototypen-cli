@@ -27,6 +27,7 @@ import {
   sameSize,
   type Bounds,
   type DesignNode,
+  type RenderOptions,
 } from '../../openpencil/src/index.js';
 import {
   describeNode,
@@ -607,7 +608,11 @@ function screenBases(interactions: Interactions): Record<string, string> {
     ),
   );
 }
-export function renderScreens(project: string, screen?: string): string[] {
+export function renderScreens(
+  project: string,
+  screen?: string,
+  options: RenderOptions = {},
+): string[] {
   const interactions = readInteractions(project);
   const entries = screen
     ? ([[screen, interactions.screens[screen]]] as const)
@@ -628,7 +633,7 @@ export function renderScreens(project: string, screen?: string): string[] {
       frame.node.id,
       join(workspace(project), 'prototype/renders', `${name}.png`),
       frame.bounds,
-      overrides && overrideScript(overrides),
+      { ...options, prepare: overrides && overrideScript(overrides) },
     ),
   );
 }
@@ -670,6 +675,7 @@ export function renderPages(
   project: string,
   pages: string[],
   background?: string,
+  options: RenderOptions = {},
 ): string[] {
   const color = pageRenderBackground(project, background);
   const rgb = tokenValue({ name: 'background', type: 'COLOR', value: color });
@@ -681,7 +687,7 @@ export function renderPages(
   if (duplicate)
     throw new Error(`Two pages would render to the same file: ${duplicate}`);
   return pages.map((page, index) =>
-    renderPage(project, page, outputs[index] as string, rgb),
+    renderPage(project, page, outputs[index] as string, rgb, options),
   );
 }
 export function validatePrototypeCanvas(project: string): CanvasValidation {

@@ -344,6 +344,10 @@ program
     '--background <hex>',
     'Opaque page background (default: canvas token, else page background)',
   )
+  .option(
+    '--web-fonts',
+    'Fetch fonts missing from docs/design/assets/fonts from web font providers',
+  )
   .option('--json', 'Machine-readable JSON')
   .action(
     (
@@ -352,6 +356,7 @@ program
         page: string[];
         system?: boolean;
         background?: string;
+        webFonts?: boolean;
         json?: boolean;
       },
     ) => {
@@ -359,15 +364,26 @@ program
         ...options.page,
         ...(options.system ? [DESIGN_SYSTEM_PAGE] : []),
       ];
+      const warnings: string[] = [];
+      const render = { webFonts: options.webFonts, warnings };
       if (!pages.length)
-        return output(renderScreens(root(), screen), options.json);
-      output(
-        {
-          screens: screen ? renderScreens(root(), screen) : [],
-          pages: renderPages(root(), [...new Set(pages)], options.background),
-        },
-        options.json,
-      );
+        output(renderScreens(root(), screen, render), options.json);
+      else
+        output(
+          {
+            screens: screen ? renderScreens(root(), screen, render) : [],
+            pages: renderPages(
+              root(),
+              [...new Set(pages)],
+              options.background,
+              render,
+            ),
+          },
+          options.json,
+        );
+      // Stdout keeps the render paths; each missing face is reported once on stderr.
+      for (const warning of new Set(warnings))
+        console.error(`warning: ${warning}`);
     },
   );
 program

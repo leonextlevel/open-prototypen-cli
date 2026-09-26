@@ -22,6 +22,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `open-prototypen eval <script.js> [--write]` runs a script on the project `.fig` with helpers available as `op` (`token`, `bind`, `master`, `page`, `byRef`, `setRef`, `freeSpot`, `place`) that resolve nodes by name or reference instead of IDs that change on save. ([#23](https://github.com/leonextlevel/open-prototypen-cli/issues/23))
 - A screen in `interactions.yaml` can derive from another screen with `base` and `overrides` for text and visibility; `render` applies them to a temporary copy of the `.fig`, so each state no longer needs its own cloned frame. ([#24](https://github.com/leonextlevel/open-prototypen-cli/issues/24))
 - The design skill has a color reference on role-based palettes, tonal scales, accent discipline, semantic separation, WCAG contrast, and dark themes. ([#34](https://github.com/leonextlevel/open-prototypen-cli/issues/34))
+- `render` loads project fonts from `docs/design/assets/fonts/<Family>/<Style>.ttf` or `.otf` without the network, `render --web-fonts` fetches missing families from web font providers, and `render` and `validate canvas` warn `font-substitution` about faces whose text would be missing from renders. ([#36](https://github.com/leonextlevel/open-prototypen-cli/issues/36))
 
 ### Changed
 
@@ -32,6 +33,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The headless OpenPencil reference shows how to build auto-layout component masters with padding and gaps bound to spacing variables, and documents that hug sizing is not applied and that instances created in the same script as their master need a later save. ([#16](https://github.com/leonextlevel/open-prototypen-cli/issues/16))
 - Component names in `system.yaml` may be namespaced with `/`, such as `icon/check`, so icon masters like `icon/check/16-muted` can be declared and validated; state names still cannot contain `/`. ([#19](https://github.com/leonextlevel/open-prototypen-cli/issues/19))
 - The design skill lists focused references with when to read each one: a new intentional-design reference turns product context into design consequences, and the system contract, `Design System` page, components, and icons moved from `visual-system.md` to `design-system.md`. `update` removes installed skill files that are no longer shipped unless they were edited. ([#33](https://github.com/leonextlevel/open-prototypen-cli/issues/33))
+- `render` no longer fetches fonts from the network by default, so renders do not depend on connectivity; pass `--web-fonts` to fetch them. ([#36](https://github.com/leonextlevel/open-prototypen-cli/issues/36))
 
 ### Fixed
 
