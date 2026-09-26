@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
-import { join, relative, resolve } from 'node:path';
+import { basename, join, relative, resolve } from 'node:path';
 import { Command, InvalidArgumentError } from 'commander';
 import {
   artifactPath,
@@ -17,7 +17,9 @@ import { inspectCanvas } from '../../../packages/openpencil/src/index.js';
 import {
   applyDesignSystem,
   importSvg,
+  importSvgVariants,
   inspectNativeSystem,
+  parseVariants,
 } from '../../../packages/openpencil/src/system.js';
 import {
   clearRefs,
@@ -250,6 +252,10 @@ program
     coordinate,
   )
   .option('--component', 'Make the import a component master')
+  .option(
+    '--variants <list>',
+    'Create one master per <size>:<color token>, such as 16:color/icon/muted,24:color/accent',
+  )
   .option('--json', 'Machine-readable JSON')
   .action(
     (
@@ -260,9 +266,22 @@ program
         x?: number;
         y?: number;
         component?: boolean;
+        variants?: string;
         json?: boolean;
       },
-    ) => output(importSvg(root(), file, options.name, options), options.json),
+    ) =>
+      output(
+        options.variants
+          ? importSvgVariants(
+              root(),
+              file,
+              options.name ?? basename(file).replace(/\.svg$/i, ''),
+              parseVariants(options.variants),
+              options,
+            )
+          : importSvg(root(), file, options.name, options),
+        options.json,
+      ),
   );
 const ref = program
   .command('ref')

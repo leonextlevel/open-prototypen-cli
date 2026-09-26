@@ -238,22 +238,32 @@ export async function applyDesignSystem(
   };
 }
 
-// Gap between an automatically placed import and the page's existing content.
+// Gap between an automatically placed import and the page's existing content or the previous import.
 const IMPORT_GAP = 32;
-export function importSvg(
-  project: string,
-  svgPath: string,
-  name?: string,
-  options: { page?: string; x?: number; y?: number; component?: boolean } = {},
-): {
-  document: string;
+type ImportOptions = { page?: string; x?: number; y?: number };
+type ImportedNode = {
   id: string;
   name: string;
   type: string;
   page: string;
   x: number;
   y: number;
-} {
+  width: number;
+  height: number;
+};
+// One imported copy of the SVG: its node name, an optional size for its longer side, whether it
+// becomes a master, and an optional COLOR variable bound to its vector paints.
+type ImportItem = {
+  name: string;
+  size?: number;
+  component: boolean;
+  variable?: {
+    id: string;
+    color: { r: number; g: number; b: number; a: number };
+  };
+};
+
+function readSvg(svgPath: string): { file: string; svg: string } {
   const file = resolve(svgPath);
   if (extname(file).toLowerCase() !== '.svg')
     throw new Error('Expected an .svg file');
@@ -265,21 +275,23 @@ export function importSvg(
     /(?:href|xlink:href)\s*=\s*["'](?:https?:|data:|javascript:)/i.test(svg)
   )
     throw new Error('SVG contains unsupported active or external content');
-  const importedName =
-    name ??
-    file
-      .split('/')
-      .at(-1)
-      ?.replace(/\.svg$/i, '') ??
-    'SVG';
-  if (
-    inspectNativeSystem(project).nodes.some(
-      (node) => node.name === importedName,
-    )
-  )
-    throw new Error(
-      `A node named ${importedName} already exists; pass a unique --name`,
-    );
+  return { file, svg };
+}
+
+function importItems(
+  project: string,
+  svg: string,
+  items: ImportItem[],
+  options: ImportOptions,
+): ImportedNode[] {
+  const existing = new Set(
+    inspectNativeSystem(project).nodes.map((node) => node.name),
+  );
+  for (const item of items)
+    if (existing.has(item.name))
+      throw new Error(
+        `A node named ${item.name} already exists; pass a unique --name`,
+      );
   const result = evalDocument(
     project,
     `
@@ -295,52 +307,153 @@ export function importSvg(
     if (x === null)
       x = content.length ? Math.max(...content.map((node) => node.x + node.width)) + ${IMPORT_GAP} : 0;
     if (y === null) y = content.length ? Math.min(...content.map((node) => node.y)) : 0;
-    let result = await importSVG.execute(figma, {
-      svg: ${JSON.stringify(svg)}, name: ${JSON.stringify(importedName)},
-      parent_id: page.id, x, y
-    });
-    if (result?.id && ${JSON.stringify(Boolean(options.component))}) {
-      const master = figma.createComponentFromNode(figma.getNodeById(result.id));
-      result = { id: master.id, name: master.name, type: master.type };
-    }
-    // OpenPencil maps stroke-linecap and stroke-linejoin onto each stroke, but saves only the
-    // node-level strokeCap and strokeJoin, so copy them there before saving.
     const graph = figma.graph;
-    const visit = (id) => {
+    const descendants = (id) => {
       const node = graph.getNode(id);
-      if (!node) return;
-      const stroke = node.strokes?.[0];
-      if (node.type === 'VECTOR' && stroke && (stroke.cap || stroke.join))
-        graph.updateNode(id, {
-          ...(stroke.cap ? { strokeCap: stroke.cap } : {}),
-          ...(stroke.join ? { strokeJoin: stroke.join } : {}),
-        });
-      for (const child of node.childIds ?? []) visit(child);
+      return node ? [node, ...node.childIds.flatMap(descendants)] : [];
     };
-    if (result?.id) visit(result.id);
-    return { ...result, page: page.name };`,
+    const containers = new Set(['FRAME', 'GROUP', 'COMPONENT', 'INSTANCE']);
+    for (const item of ${JSON.stringify(items)}) {
+      const imported = await importSVG.execute(figma, {
+        svg: ${JSON.stringify(svg)}, name: item.name, parent_id: page.id, x, y
+      });
+      if (!imported?.id) return { error: imported?.error ?? 'OpenPencil could not import SVG' };
+      let node = figma.getNodeById(imported.id);
+      if (item.size) node.rescale(item.size / Math.max(node.width, node.height));
+      if (item.component) node = figma.createComponentFromNode(node);
+      for (const child of descendants(node.id)) {
+        // OpenPencil maps stroke-linecap and stroke-linejoin onto each stroke, but saves only the
+        // node-level strokeCap and strokeJoin, so copy them there before saving.
+        const stroke = child.strokes?.[0];
+        if (child.type === 'VECTOR' && stroke && (stroke.cap || stroke.join))
+          graph.updateNode(child.id, {
+            ...(stroke.cap ? { strokeCap: stroke.cap } : {}),
+            ...(stroke.join ? { strokeJoin: stroke.join } : {}),
+          });
+        if (!item.variable || containers.has(child.type)) continue;
+        // Binding does not repaint a literal, so write the token color before binding it.
+        for (const field of ['fills', 'strokes']) {
+          const paint = child[field]?.[0];
+          // Strokes carry a color without a paint type; fills are typed paints.
+          if (!paint?.color || paint.visible === false) continue;
+          if (field === 'fills' && paint.type !== 'SOLID') continue;
+          graph.updateNode(child.id, {
+            [field]: child[field].map((entry, index) =>
+              index === 0 ? { ...entry, color: item.variable.color } : entry),
+          });
+          figma.bindVariable(child.id, field + '/0/color', item.variable.id);
+        }
+      }
+      x += node.width + ${IMPORT_GAP};
+    }
+    return { page: page.name };`,
     true,
-  ) as {
-    id?: string;
-    name?: string;
-    type?: string;
-    page?: string;
-    error?: string;
-  };
-  if (result.error || !result.id || !result.name || !result.type)
+  ) as { page?: string; error?: string };
+  if (result.error || !result.page)
     throw new Error(result.error ?? 'OpenPencil could not import SVG');
-  const imported = inspectCanvas(project).tree.find(
-    (node) => node.name === importedName && node.page === result.page,
+  const tree = inspectCanvas(project).tree;
+  return items.map((item) => {
+    const node = tree.find(
+      (entry) => entry.name === item.name && entry.page === result.page,
+    );
+    if (!node)
+      throw new Error(`Imported SVG ${item.name} was not found after saving`);
+    return {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      page: result.page ?? '',
+      x: node.x,
+      y: node.y,
+      width: node.width,
+      height: node.height,
+    };
+  });
+}
+
+export function importSvg(
+  project: string,
+  svgPath: string,
+  name?: string,
+  options: ImportOptions & { component?: boolean } = {},
+): { document: string } & ImportedNode {
+  const { file, svg } = readSvg(svgPath);
+  const importedName =
+    name ??
+    file
+      .split('/')
+      .at(-1)
+      ?.replace(/\.svg$/i, '') ??
+    'SVG';
+  const [imported] = importItems(
+    project,
+    svg,
+    [{ name: importedName, component: Boolean(options.component) }],
+    options,
   );
-  if (!imported)
-    throw new Error(`Imported SVG ${importedName} was not found after saving`);
+  return { document: figPath(project), ...(imported as ImportedNode) };
+}
+
+// Parses `16:color/icon/muted,24:color/accent` into sizes and COLOR token names.
+export function parseVariants(
+  value: string,
+): { size: number; token: string }[] {
+  return value.split(',').map((entry) => {
+    const match = /^\s*(\d+(?:\.\d+)?)\s*:\s*(\S+)\s*$/.exec(entry);
+    const size = Number(match?.[1]);
+    if (!match?.[2] || !(size > 0))
+      throw new Error(
+        `Invalid variant ${entry.trim()}; expected <size>:<color token>, such as 16:color/icon/muted`,
+      );
+    return { size, token: match[2] };
+  });
+}
+
+// Creates one master per variant, named <name>/<size>-<last token segment>, rescaled so its longer
+// side is the size, with its vector fills and strokes bound to the COLOR token.
+export function importSvgVariants(
+  project: string,
+  svgPath: string,
+  name: string,
+  variants: { size: number; token: string }[],
+  options: ImportOptions = {},
+): { document: string; page: string; masters: ImportedNode[] } {
+  const { svg } = readSvg(svgPath);
+  const system = readDesignSystem(project);
+  const native = inspectNativeSystem(project);
+  const collection = native.collections.find(
+    (item) => item.name === SYSTEM_COLLECTION,
+  );
+  const items = variants.map(({ size, token }) => {
+    const declared = system.tokens.find((entry) => entry.name === token);
+    if (!declared) throw new Error(`Unknown token: ${token}`);
+    if (declared.type !== 'COLOR')
+      throw new Error(`Token ${token} is ${declared.type}, not a COLOR`);
+    const variable = native.variables.find(
+      (entry) => entry.name === token && entry.collectionId === collection?.id,
+    );
+    if (!variable)
+      throw new Error(
+        `Native variable ${token} does not exist; run open-prototypen system apply`,
+      );
+    const suffix = token.split(/[/.]/).at(-1) ?? token;
+    const color = tokenValue(declared);
+    if (typeof color !== 'object') throw new Error(`Invalid color ${token}`);
+    return {
+      name: `${name}/${size}-${suffix}`,
+      size,
+      component: true,
+      variable: { id: variable.id, color },
+    };
+  });
+  const names = items.map((item) => item.name);
+  const duplicate = names.find((item, index) => names.indexOf(item) !== index);
+  if (duplicate)
+    throw new Error(`Two variants would both be named ${duplicate}`);
+  const masters = importItems(project, svg, items, options);
   return {
     document: figPath(project),
-    id: imported.id,
-    name: imported.name,
-    type: imported.type,
-    page: imported.page ?? result.page ?? '',
-    x: imported.x,
-    y: imported.y,
+    page: masters[0]?.page ?? '',
+    masters,
   };
 }
