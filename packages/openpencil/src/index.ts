@@ -173,6 +173,90 @@ export function sameSize(actual: Size, expected: Size): boolean {
     Math.abs(actual.height - expected.height) <= 1
   );
 }
+// Project fonts live in docs/design/assets/fonts/<Family>/<Style>.ttf or .otf.
+export function fontsPath(project: string): string {
+  return join(workspace(project), 'assets/fonts');
+}
+export type RenderOptions = {
+  // Fetch missing families from OpenPencil's web font providers; off by default so renders do not
+  // depend on the network.
+  webFonts?: boolean;
+  // Receives each face that renders without its font; OpenPencil leaves such text out of the PNG.
+  warnings?: string[];
+};
+// Script lines that load project fonts through OpenPencil's host font loader and, unless web fonts
+// are allowed, disable its online providers.
+function fontSetup(project: string, webFonts = false): string {
+  return `
+    const { readFile, readdir } = await import('node:fs/promises');
+    const { join, extname, basename } = await import('node:path');
+    const { fontManager, prepareGraphFonts } = await import('@open-pencil/core/text');
+    const fontFiles = new Map();
+    const fontsDirectory = ${JSON.stringify(fontsPath(project))};
+    const entries = await readdir(fontsDirectory, { withFileTypes: true }).catch(() => []);
+    for (const family of entries.filter((entry) => entry.isDirectory()))
+      for (const file of await readdir(join(fontsDirectory, family.name)))
+        if (/^\.(ttf|otf)$/i.test(extname(file)))
+          fontFiles.set(family.name + '|' + basename(file, extname(file)), join(fontsDirectory, family.name, file));
+    fontManager.setHostFontLoader(async (family, style) => {
+      const path = fontFiles.get(family + '|' + style);
+      if (!path) return null;
+      const data = await readFile(path);
+      return data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+    });
+    if (!${JSON.stringify(webFonts)}) {
+      fontManager.setOnlineFontProviders({});
+      fontManager.setWebFontFetch(null);
+    }`;
+}
+export function fontWarning(family: string, style: string): string {
+  return `Font ${family} ${style} is not available, so text in it is missing from renders; add docs/design/assets/fonts/${family}/${style}.ttf or render with --web-fonts`;
+}
+// Faces used by text on any page that neither the project fonts nor OpenPencil's bundled Inter
+// provide, checked without the network.
+export function missingFonts(
+  project: string,
+): { family: string; style: string; nodes: string[] }[] {
+  return evalDocument(
+    project,
+    `${fontSetup(project)}
+    const graph = figma.graph;
+    const status = await prepareGraphFonts(graph, graph.getPages().map((page) => page.id));
+    return status.issues.map(({ family, style, nodeNames }) => ({ family, style, nodes: nodeNames ?? [] }));`,
+  ) as { family: string; style: string; nodes: string[] }[];
+}
+// Exports a node or page to PNG inside an eval, the way openpencil export does, so project fonts
+// can be loaded.
+function exportPng(
+  project: string,
+  file: string,
+  target: { node: string } | { page: string },
+  output: string,
+  options: RenderOptions,
+): void {
+  const result = evalFile(
+    file,
+    `${fontSetup(project, options.webFonts)}
+    const { writeFile } = await import('node:fs/promises');
+    const { BUILTIN_IO_FORMATS, IORegistry } = await import('@open-pencil/core/io');
+    const { populateAllLazyFigImportRoots } = await import('@open-pencil/core/kiwi');
+    const { computeAllLayouts } = await import('@open-pencil/core/layout');
+    const graph = figma.graph;
+    if (populateAllLazyFigImportRoots(graph)) computeAllLayouts(graph);
+    const wanted = ${JSON.stringify(target)};
+    const page = wanted.page && graph.getPages().find((item) => item.name === wanted.page);
+    if (wanted.page && !page) return { error: 'Unknown page: ' + wanted.page };
+    const scope = page ? { scope: 'page', pageId: page.id } : { scope: 'node', nodeId: wanted.node };
+    const status = await prepareGraphFonts(graph, [page ? page.id : wanted.node]);
+    const png = await new IORegistry(BUILTIN_IO_FORMATS).exportContent(
+      'png', { graph, target: scope }, { format: 'PNG', scale: 1 });
+    await writeFile(${JSON.stringify(output)}, png.data);
+    return { substitutions: status.issues.map(({ family, style }) => ({ family, style })) };`,
+  ) as { error?: string; substitutions?: { family: string; style: string }[] };
+  if (result.error) throw new Error(result.error);
+  for (const { family, style } of result.substitutions ?? [])
+    options.warnings?.push(fontWarning(family, style));
+}
 // `prepare` is a script run on a temporary copy of the document before the export, so a variant
 // can change text or visibility without touching the project file.
 export function renderFrame(
@@ -180,8 +264,9 @@ export function renderFrame(
   frameId: string,
   output: string,
   expected?: Size,
-  prepare?: string,
+  options: RenderOptions & { prepare?: string } = {},
 ): string {
+  const { prepare } = options;
   let file = figPath(project);
   if (!existsSync(file))
     throw new Error(`OpenPencil document does not exist: ${file}`);
@@ -201,7 +286,7 @@ export function renderFrame(
       evalFile(copy, prepare, true);
       file = copy;
     }
-    run(['export', file, '-f', 'png', '--node', frameId, '-o', temporary]);
+    exportPng(project, file, { node: frameId }, temporary, options);
     if (!existsSync(temporary))
       throw new Error(`OpenPencil did not produce ${output}`);
     if (expected) {
@@ -225,6 +310,7 @@ export function renderPage(
   page: string,
   output: string,
   background: { r: number; g: number; b: number },
+  options: RenderOptions = {},
 ): string {
   const file = figPath(project);
   if (!existsSync(file))
@@ -260,7 +346,7 @@ export function renderPage(
     if (result.error === 'empty') throw new Error(`Page ${page} is empty`);
     mkdirSync(dirname(output), { recursive: true });
     const temporary = join(directory, 'page.png');
-    run(['export', copy, '-f', 'png', '--page', page, '-o', temporary]);
+    exportPng(project, copy, { page }, temporary, options);
     if (!existsSync(temporary))
       throw new Error(`OpenPencil did not produce ${output}`);
     copyFileSync(temporary, output);

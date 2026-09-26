@@ -1,4 +1,5 @@
 import {
+  copyFileSync,
   existsSync,
   mkdtempSync,
   mkdirSync,
@@ -7,7 +8,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import {
   pageBackground,
@@ -37,7 +39,7 @@ import {
   renderScreens,
 } from '../packages/prototype/src/index.js';
 import { validateCanvas } from '../packages/validator/src/canvas.js';
-import { pngPixels } from './png.js';
+import { pixel, pngPixels } from './png.js';
 
 const roots: string[] = [];
 afterEach(() => {
@@ -870,6 +872,59 @@ it('exports pages with an opaque background without changing the project file', 
   renderPages(root, ['Design System']);
   expect(corner(pngPixels(output ?? ''))).toEqual([0, 0, 255]);
   expect(() => renderPages(root, ['Missing'])).toThrow('Unknown page: Missing');
+}, 60000);
+
+it('renders text in project fonts and warns about missing faces', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const frame = figma.createFrame(); frame.name = 'fonts'; frame.resize(300, 80);
+    frame.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 }, opacity: 1 }];
+    frame.clipsContent = true;
+    const text = figma.createText(); text.name = 'headline';
+    text.fontName = { family: 'Probe Sans', style: 'Regular' };
+    text.characters = 'Probe'; text.fontSize = 40; text.resize(280, 60);
+    frame.appendChild(text); text.x = 10; text.y = 10;
+  `,
+    true,
+  );
+  const frame = inspectCanvas(root).tree.find((node) => node.name === 'fonts');
+  const output = join(root, 'fonts.png');
+  const inked = () => {
+    const image = pngPixels(output);
+    return Array.from({ length: 280 * 60 }, (_, index) =>
+      pixel(image, 10 + (index % 280), 10 + Math.floor(index / 280)),
+    ).some(([red]) => (red ?? 255) < 128);
+  };
+  const substitutions = () =>
+    validateCanvas(root, {}).warnings.filter(
+      (warning) => warning.code === 'font-substitution',
+    );
+  expect(substitutions().map((warning) => warning.message)).toEqual([
+    expect.stringContaining(
+      'Font Probe Sans Regular is not available, so text in it is missing from renders; add docs/design/assets/fonts/Probe Sans/Regular.ttf or render with --web-fonts. Used by: headline',
+    ),
+  ]);
+  const warnings: string[] = [];
+  renderFrame(root, frame?.id ?? '', output, undefined, { warnings });
+  expect(warnings).toEqual([
+    expect.stringContaining('Font Probe Sans Regular is not available'),
+  ]);
+  expect(inked()).toBe(false);
+  // Any TrueType file serves; the folder and file names give the family and style.
+  const fonts = join(root, 'docs/design/assets/fonts/Probe Sans');
+  mkdirSync(fonts, { recursive: true });
+  const core = dirname(
+    createRequire(import.meta.url).resolve('@open-pencil/core/package.json'),
+  );
+  copyFileSync(join(core, 'assets/Inter-Bold.ttf'), join(fonts, 'Regular.ttf'));
+  expect(substitutions()).toEqual([]);
+  warnings.length = 0;
+  renderFrame(root, frame?.id ?? '', output, undefined, { warnings });
+  expect(warnings).toEqual([]);
+  expect(inked()).toBe(true);
 }, 60000);
 
 it('chooses a neutral page background slightly apart from every token color', () => {
