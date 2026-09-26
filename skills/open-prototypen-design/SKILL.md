@@ -13,6 +13,7 @@ Read a reference only when the decision in front of you needs it:
 
 - [Intentional design](references/intentional-design.md): before writing the direction, and whenever a choice feels like a default.
 - [Color](references/color.md): when choosing palette roles and scales, placing the accent, adding a dark theme, or checking contrast.
+- [Typography](references/typography.md): when choosing typefaces, defining the type scale, setting text for reading or data, or checking that type renders.
 - [Design system contract and page](references/design-system.md): when writing `system.yaml`, building the `Design System` page, choosing components and states, or importing icons.
 - [Headless OpenPencil](references/openpencil-headless.md): before scripting edits to the `.fig`.
 

@@ -5,7 +5,7 @@ Read this when writing `design/system.yaml`, building the `Design System` page, 
 ## Foundations
 
 - **Default.** Define semantic color roles and build them from tonal scales, as [the color reference](color.md) explains, and check real foreground and background pairs in rendered screens.
-- **Default.** Define a role-based type scale: page title, section title, body, supporting text, and control label as needed. Specify family, weight, size, and line height, and check long labels and real content before adding styles. Verify that the families and weights appear in a render before committing to them: add the font files under `docs/design/assets/fonts/<Family>/<Style>.ttf` and resolve every `font-substitution` warning, as [the headless reference](openpencil-headless.md) explains.
+- **Default.** Define a role-based type scale, as [the typography reference](typography.md) explains: family, weight, size, and line height per role, checked with long labels and real content. Verify that the families and weights appear in a render before committing to them: add the font files under `docs/design/assets/fonts/<Family>/<Style>.ttf` and resolve every `font-substitution` warning, as [the headless reference](openpencil-headless.md) explains.
 - **Default.** Define a spacing rhythm and alignment rules. Pick values for relationships (inside a control, between related content, between sections) and use them consistently. Use OpenPencil auto-layout where it keeps repeated content editable.
 
 ## The contract
