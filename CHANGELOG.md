@@ -4,6 +4,10 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 
 ## [Unreleased]
 
+### Added
+
+- `validate canvas` warns `master-label` about text on the `Design System` page that repeats a component master's name, and the design and component review skills keep text there to group headings and token sample labels. ([#29](https://github.com/leonextlevel/open-prototypen-cli/issues/29))
+
 ### Fixed
 
 - When several active actions share a node, the prototype renders a single hotspot for the one declared last, so keyboard and screen reader users reach the same action as pointer users. ([#3](https://github.com/leonextlevel/open-prototypen-cli/issues/3))
