@@ -54,6 +54,32 @@ Use `inspect screen <screen> --json` to confirm bounds and warnings.
 
 Give screens a `title` and `content`, and actions a `label`, in the project's language. These are required. `content` should include all meaningful visible information because the PNG itself has empty alternative text. The runtime presents this content to screen readers while preserving the visual image.
 
+## Screen variants
+
+A screen can derive from another screen's frame instead of having its own. List `base` instead of `frame`, and `overrides` for what changes:
+
+```yaml
+screens:
+  cart-error:
+    base: cart
+    overrides:
+      text:
+        status-message: 'Payment was declined'
+        'notice:label': 'Declined'
+      hidden: [pay-button]
+      shown: [retry-button]
+    title: 'Payment declined'
+    content: 'The payment was declined. Retry it or choose another method.'
+    actions:
+      retry:
+        node: retry-button
+        label: 'Retry payment'
+        action: navigate
+        target: confirmation
+```
+
+Override targets are references to nodes in the base frame, or `<ref>:<part>` for a layer inside a referenced instance. `text` replaces the characters of text nodes, `hidden` hides nodes, and `shown` shows nodes that are hidden in the base frame. `render` applies the overrides to a temporary copy of the `.fig` and exports the base frame as `renders/<variant>.png`; the project file does not change. Hotspots use the base frame's geometry, and an action on a hidden node, or on a node inside one, is an error. The base must be a screen with its own `frame`. In `system.yaml`, a component whose `screens` lists the base also covers its variants. Instance swaps are not supported; use a separate frame when a variant needs a different component.
+
 ## Geometry checks
 
 - A screen `frame` must be a top-level frame of a page. Anything else is rejected before export, so a stale reference cannot overwrite a render.
@@ -72,7 +98,7 @@ Give screens a `title` and `content`, and actions a `label`, in the project's la
 | `set-state`     | `key`, `value`, optional `target`        | Store runtime state; optionally navigate.                                                                                                                                                                                                                                                                               |
 | `external-link` | HTTP(S) `url`                            | Open a link in a new tab.                                                                                                                                                                                                                                                                                               |
 
-Any action can add `when: {key: ..., value: ...}` to become available only when that state has been set. When several active actions share a node, only the one declared last gets a hotspot, so pointer, keyboard, and screen reader users all reach the same action; `covered-action` warns when an action can never be clicked because a later one on the same node is active whenever it is. Declare the default action first and the state-specific override after it on the same node. The runtime keeps state in memory for the current visit. It does not synthesize visual states inside a PNG: use a target screen when the visual response must change. To simulate an outcome the prototype cannot compute, such as a server error or a resource conflict, declare a scenario, or let a first attempt that fails set the state, and give the overriding action a `when` that leads to the matching state screen. The exit from an error state leads to a screen that reflects the error and lets the user complete the task by another path: a retry may succeed after a transient failure, but a resource someone else just took stays unavailable and the user finishes with another one.
+Any action can add `when: {key: ..., value: ...}` to become available only when that state has been set. When several active actions share a node, only the one declared last gets a hotspot, so pointer, keyboard, and screen reader users all reach the same action; `covered-action` warns when an action can never be clicked because a later one on the same node is active whenever it is. Declare the default action first and the state-specific override after it on the same node. The runtime keeps state in memory for the current visit. It does not synthesize visual states inside a PNG: use a target screen when the visual response must change, or a screen variant when that screen differs from another only in text or visibility. To simulate an outcome the prototype cannot compute, such as a server error or a resource conflict, declare a scenario, or let a first attempt that fails set the state, and give the overriding action a `when` that leads to the matching state screen. The exit from an error state leads to a screen that reflects the error and lets the user complete the task by another path: a retry may succeed after a transient failure, but a resource someone else just took stays unavailable and the user finishes with another one.
 
 Keyboard focus follows each action. A screen change moves focus to the new screen's title, which screen readers announce. A `set-state` without a target keeps focus on the same hotspot, which may now run a different action. Closing an overlay, by action, Escape, or backdrop click, returns focus to the hotspot that opened it.
 

@@ -25,6 +25,7 @@ import {
   renderScreens,
 } from '../packages/prototype/src/index.js';
 import { packageRoot } from '../packages/schemas/src/index.js';
+import { pixel, pngPixels } from './png.js';
 
 const projects: string[] = [];
 afterEach(() => {
@@ -689,3 +690,166 @@ screens:
   },
   60000,
 );
+
+it('renders screen variants from a base frame with overrides', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'open-prototypen-variants-'));
+  projects.push(root);
+  initProject(root, 'codex');
+  writeFileSync(
+    join(root, 'docs/design/config.yaml'),
+    'version: 1\nschema: default\nlanguage:\n  mode: auto\n  fallback: en\ndesignEngine: openpencil\n',
+  );
+  mkdirSync(join(root, 'docs/design/design'), { recursive: true });
+  writeFileSync(
+    join(root, 'docs/design/design/system.yaml'),
+    "version: 1\ntokens:\n  - name: color.surface\n    type: COLOR\n    value: '#112233'\ncomponents:\n  - name: Probe\n    states: [default]\n",
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const solid = (r, g, b) => [{ type: 'SOLID', color: { r, g, b, a: 1 }, opacity: 1, visible: true }];
+    const banner = figma.createComponent(); banner.name = 'Banner/default'; banner.resize(160, 20);
+    const label = figma.createText(); label.name = 'label'; label.characters = 'Pending';
+    label.resize(160, 20); banner.appendChild(label);
+    banner.x = 600;
+    const cart = figma.createFrame(); cart.name = 'cart'; cart.resize(200, 160);
+    cart.fills = solid(1, 1, 1);
+    const status = figma.createText(); status.name = 'status'; status.characters = 'Ready';
+    status.resize(160, 20); cart.appendChild(status); status.x = 20; status.y = 20;
+    const pay = figma.createRectangle(); pay.name = 'pay'; pay.resize(60, 30); pay.fills = solid(1, 0, 0);
+    cart.appendChild(pay); pay.x = 20; pay.y = 60;
+    const retry = figma.createRectangle(); retry.name = 'retry'; retry.resize(60, 30); retry.fills = solid(0, 1, 0);
+    cart.appendChild(retry); retry.x = 100; retry.y = 60; retry.visible = false;
+    cart.clipsContent = true;
+    const done = figma.createFrame(); done.name = 'done'; done.resize(200, 160); done.x = 300;
+  `,
+    true,
+  );
+  // Instances go in a later script than their master.
+  evalDocument(
+    root,
+    `
+    const banner = figma.root.findAll((node) => node.name === 'Banner/default')[0];
+    const cart = figma.root.findAll((node) => node.name === 'cart')[0];
+    const notice = banner.createInstance(); cart.appendChild(notice); notice.x = 20; notice.y = 120;
+  `,
+    true,
+  );
+  const tree = inspectCanvas(root).tree;
+  const id = (name: string) => {
+    const visit = (nodes: typeof tree): string | undefined =>
+      nodes
+        .map((node) =>
+          node.name === name ? node.id : visit(node.children ?? []),
+        )
+        .find(Boolean);
+    return visit(tree) ?? '';
+  };
+  setRefs(root, [
+    { id: id('cart'), ref: 'cart' },
+    { id: id('status'), ref: 'status-message' },
+    { id: id('pay'), ref: 'pay-button' },
+    { id: id('retry'), ref: 'retry-button' },
+    { id: id('done'), ref: 'done' },
+    {
+      id:
+        tree
+          .find((node) => node.name === 'cart')
+          ?.children?.find((node) => node.type === 'INSTANCE')?.id ?? '',
+      ref: 'notice',
+    },
+  ]);
+  const interactions = (variantActions: string, extra = '') =>
+    writeFileSync(
+      join(root, 'docs/design/prototype/interactions.yaml'),
+      `version: 1
+initialScreen: cart
+screens:
+  cart:
+    frame: cart
+    title: Cart
+    content: Cart ready to pay.
+    actions:
+      pay:
+        node: pay-button
+        label: Pay
+        action: navigate
+        target: cart-error
+  cart-error:
+    base: cart
+    overrides:
+      text:
+        status-message: Payment was declined
+        'notice:label': Declined
+      hidden: [pay-button]
+      shown: [retry-button]${extra}
+    title: Payment declined
+    content: The payment was declined; retry it.
+    actions:
+${variantActions}
+  done:
+    frame: done
+    title: Done
+    content: Order placed.
+`,
+    );
+  interactions(
+    '      retry:\n        node: retry-button\n        label: Retry\n        action: navigate\n        target: done',
+  );
+  const before = readFileSync(
+    join(root, 'docs/design/prototype/prototype.fig'),
+  );
+  renderScreens(root);
+  expect(
+    readFileSync(join(root, 'docs/design/prototype/prototype.fig')).equals(
+      before,
+    ),
+  ).toBe(true);
+  const render = (name: string) =>
+    pngPixels(join(root, `docs/design/prototype/renders/${name}.png`));
+  const [base, variant] = [render('cart'), render('cart-error')];
+  expect(pixel(base, 50, 75)).toEqual([255, 0, 0]);
+  expect(pixel(base, 130, 75)).toEqual([255, 255, 255]);
+  expect(pixel(variant, 50, 75)).toEqual([255, 255, 255]);
+  expect(pixel(variant, 130, 75)).toEqual([0, 255, 0]);
+  // The text overrides change pixels in the status line and in the instance's label.
+  const differs = (y: number) =>
+    Array.from({ length: 160 }, (_, x) =>
+      pixel(base, 20 + x, y + 10).join(),
+    ).join() !==
+    Array.from({ length: 160 }, (_, x) =>
+      pixel(variant, 20 + x, y + 10).join(),
+    ).join();
+  expect(differs(20)).toBe(true);
+  expect(differs(120)).toBe(true);
+  const result = compilePrototype(root);
+  const manifest = JSON.parse(
+    readFileSync(join(result.output, 'manifest.json'), 'utf8'),
+  );
+  expect(manifest.screens['cart-error']).toMatchObject({
+    width: 200,
+    height: 160,
+    actions: { retry: { bounds: { x: 100, y: 60, width: 60, height: 30 } } },
+  });
+  interactions(
+    '      pay:\n        node: pay-button\n        label: Pay\n        action: navigate\n        target: done',
+  );
+  expect(() => compilePrototype(root)).toThrow(
+    'Action cart-error.pay: RECTANGLE pay',
+  );
+  expect(() => compilePrototype(root)).toThrow('is hidden in this variant');
+  interactions('      {}', '\n    frame: cart');
+  expect(() => renderScreens(root)).toThrow(
+    'Screen cart-error needs either a frame or a base',
+  );
+  interactions('      {}');
+  writeFileSync(
+    join(root, 'docs/design/prototype/interactions.yaml'),
+    readFileSync(
+      join(root, 'docs/design/prototype/interactions.yaml'),
+      'utf8',
+    ).replace('status-message: Payment', 'pay-button: Payment'),
+  );
+  expect(() => renderScreens(root)).toThrow('is not a text node');
+}, 60000);

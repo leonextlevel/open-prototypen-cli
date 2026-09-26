@@ -179,6 +179,7 @@ function componentName(master: string): string {
 // The inverse of the screen check: instances on screens their component does not declare, and
 // masters without any linked instance, including instances inside other masters.
 function componentUsageWarnings(
+  screenBases: Record<string, string>,
   system: DesignSystem,
   screenFrames: Record<string, string>,
   components: NativeNode[],
@@ -197,7 +198,13 @@ function componentUsageWarnings(
       if (!master || !descendsFrom(node, frameId, nodes)) continue;
       const name = componentName(nodes.get(master)?.name ?? '');
       const entry = system.components.find((item) => item.name === name);
-      if (!entry || entry.screens.includes(screen) || reported.has(name))
+      const base = screenBases[screen];
+      if (
+        !entry ||
+        entry.screens.includes(screen) ||
+        (base && entry.screens.includes(base)) ||
+        reported.has(name)
+      )
         continue;
       reported.add(name);
       warnings.push({
@@ -306,9 +313,11 @@ function pageBackgroundWarnings(
     }));
 }
 
+// `screenBases` maps variant screens to the base screen whose frame they render.
 export function validateCanvas(
   project: string,
   screenFrames: Record<string, string>,
+  screenBases: Record<string, string> = {},
 ): CanvasValidation {
   loadConfig(project);
   const findings: CanvasFinding[] = [];
@@ -483,6 +492,7 @@ export function validateCanvas(
       ...masterLabelWarnings(components, nodes),
       ...tokenLabelWarnings(system.tokens, nodes),
       ...componentUsageWarnings(
+        screenBases,
         system,
         screenFrames,
         components,

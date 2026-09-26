@@ -173,13 +173,16 @@ export function sameSize(actual: Size, expected: Size): boolean {
     Math.abs(actual.height - expected.height) <= 1
   );
 }
+// `prepare` is a script run on a temporary copy of the document before the export, so a variant
+// can change text or visibility without touching the project file.
 export function renderFrame(
   project: string,
   frameId: string,
   output: string,
   expected?: Size,
+  prepare?: string,
 ): string {
-  const file = figPath(project);
+  let file = figPath(project);
   if (!existsSync(file))
     throw new Error(`OpenPencil document does not exist: ${file}`);
   mkdirSync(dirname(output), { recursive: true });
@@ -188,7 +191,16 @@ export function renderFrame(
     dirname(output),
     `.${basename(output, '.png')}.${process.pid}.tmp.png`,
   );
+  const directory = prepare
+    ? mkdtempSync(join(tmpdir(), 'open-prototypen-variant-'))
+    : undefined;
   try {
+    if (directory && prepare) {
+      const copy = join(directory, 'variant.fig');
+      copyFileSync(file, copy);
+      evalFile(copy, prepare, true);
+      file = copy;
+    }
     run(['export', file, '-f', 'png', '--node', frameId, '-o', temporary]);
     if (!existsSync(temporary))
       throw new Error(`OpenPencil did not produce ${output}`);
@@ -202,6 +214,7 @@ export function renderFrame(
     renameSync(temporary, output);
   } finally {
     rmSync(temporary, { force: true });
+    if (directory) rmSync(directory, { recursive: true, force: true });
   }
   return output;
 }
