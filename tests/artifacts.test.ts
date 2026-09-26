@@ -126,6 +126,48 @@ describe('artifact workflow', () => {
     ).toEqual([]);
   });
 
+  it('keeps directions written for the previous template valid', () => {
+    const root = project();
+    const path = artifactPath(root, 'design-direction');
+    mkdirSync(join(path, '..'), { recursive: true });
+    // Only the six required sections, as the template had them before the optional ones.
+    writeFileSync(
+      path,
+      `---
+artifact: design-direction
+version: 1
+status: draft
+language: pt-BR
+dependsOn:
+  - product-definition
+  - ux-research
+  - visual-research
+---
+
+# Design Direction
+
+${[
+  'Design Intent',
+  'Design Principles',
+  'Visual Hierarchy',
+  'Typography Strategy',
+  'Color Strategy',
+  'Avoid',
+]
+  .map((heading) => `## ${heading}\n\nDecisão fundamentada.\n`)
+  .join('\n')}`,
+    );
+    expect(validateArtifact(root, 'design-direction', false).findings).toEqual(
+      [],
+    );
+    // The current template with only its required sections filled is valid too.
+    put(root, 'design-direction');
+    expect(readFileSync(path, 'utf8')).toContain('## Design Signature');
+    expect(validateArtifact(root, 'design-direction', false).findings).toEqual(
+      [],
+    );
+  });
+
   it('accepts audit reports with and without the optional tables', () => {
     const root = project();
     const path = artifactPath(root, 'audit-report');

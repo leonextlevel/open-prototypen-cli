@@ -76,7 +76,7 @@ artifacts:
         Color Strategy,
         Avoid,
       ]
-    instructions: Derive a specific visual direction from product context and research. Explain hierarchy, typography, semantic color roles, spatial rhythm, and tradeoffs.
+    instructions: Derive a specific visual direction from product context and research, as the design skill's intentional-design reference explains. Turn adjectives into checkable consequences, and make each strategy name what it chooses and why this product needs it. Fill the optional sections only when they carry a real decision.
   - id: design-system
     output: design/system.md
     requires: [design-direction]
@@ -88,7 +88,7 @@ artifacts:
     requires: [design-direction]
     optional: true
     requiredSections: [Decisions, Rationale, Open Questions]
-    instructions: Record consequential design choices and deviations from the direction.
+    instructions: Record consequential design choices and deviations from the direction, with the alternatives considered and the product reason for each.
   - id: audit-report
     output: audit/report.md
     requires: [screen-map, design-direction, design-system]

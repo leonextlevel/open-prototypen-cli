@@ -36,6 +36,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - Component names in `system.yaml` may be namespaced with `/`, such as `icon/check`, so icon masters like `icon/check/16-muted` can be declared and validated; state names still cannot contain `/`. ([#19](https://github.com/leonextlevel/open-prototypen-cli/issues/19))
 - The design skill lists focused references with when to read each one: a new intentional-design reference turns product context into design consequences, and the system contract, `Design System` page, components, and icons moved from `visual-system.md` to `design-system.md`. `update` removes installed skill files that are no longer shipped unless they were edited. ([#33](https://github.com/leonextlevel/open-prototypen-cli/issues/33))
 - `render` no longer fetches fonts from the network by default, so renders do not depend on connectivity; pass `--web-fonts` to fetch them. ([#36](https://github.com/leonextlevel/open-prototypen-cli/issues/36))
+- The design-direction template asks for the product context and the consequences of each adjective, and offers optional sections for density and composition, shape and surfaces, navigation and interaction, content voice, design signature, accessibility posture, and motion; the design-decisions template asks for the alternatives considered and the product reason. ([#38](https://github.com/leonextlevel/open-prototypen-cli/issues/38))
 
 ### Fixed
 
