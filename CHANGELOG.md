@@ -21,6 +21,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The audit report template has optional `Error Recovery` and `Resolution` tables: the audit skill walks every error state in the compiled prototype and reports recoveries that cannot complete the task, and the refine skill records each decision with its evidence and asks a separate context to verify critical and high findings. ([#7](https://github.com/leonextlevel/open-prototypen-cli/issues/7))
 - The screen map template maps each state to its own screen key and how it is reached, and has an optional `Rule Coverage` table; product rules get stable IDs, the define skill fills both, and the audit skill walks every demonstrable rule in the prototype. ([#14](https://github.com/leonextlevel/open-prototypen-cli/issues/14))
 - The audit and component review skills describe the handoff when a separate review context cannot write files: the auditor returns the report for the caller to write verbatim, and the component reviewer returns an ordered change list; `docs/workflow.md` says what each review context may change. ([#15](https://github.com/leonextlevel/open-prototypen-cli/issues/15))
+- The headless OpenPencil reference shows how to build auto-layout component masters with padding and gaps bound to spacing variables, and documents that hug sizing is not applied and that instances created in the same script as their master need a later save. ([#16](https://github.com/leonextlevel/open-prototypen-cli/issues/16))
 
 ### Fixed
 

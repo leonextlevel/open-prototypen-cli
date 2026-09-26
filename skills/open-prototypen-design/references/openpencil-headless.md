@@ -12,9 +12,56 @@ Use this reference when editing the `.fig` with `eval <file.fig> --stdin --write
 
 - `appendChild` keeps a node's absolute position. Set `x` and `y` after appending, relative to the new parent.
 - Text is not measured: every text node reports 100×100 bounds regardless of content or `textAutoResize`. Size text explicitly with `resize(width, height)` when its box matters. Do not use a text node as an action node; use its container or a transparent hit rectangle.
-- Auto-layout positions children when the document is saved. Values read in the same script are stale, and unmeasured text still takes part as 100×100. Prefer explicit sizes, or absolute placement for text-heavy groups, and check the render.
+- Auto-layout positions children when the document is saved. Values read in the same script are stale, and unmeasured text still takes part as 100×100, so give text in auto-layout an explicit size. Build component masters with auto-layout and bound spacing, as shown below; keep absolute placement as the fallback for text-heavy screen groups, and check the render.
 - Content outside an unclipped frame enlarges its export, and `render` then fails. Set `frame.clipsContent = true` on screen frames and check that nothing important is cut off.
 - Resizing an icon frame does not scale its vectors; `node.rescale(factor)` scales a frame or a master together with its vectors. Check imported icons in a render: small details drawn as strokes can import with zero width and disappear.
+
+## Auto-layout masters with bound spacing
+
+Auto-layout masters keep spacing tokens in the components, and instances inherit the bindings. With OpenPencil 0.15.1:
+
+- Bind `paddingLeft`, `paddingRight`, `paddingTop`, `paddingBottom`, and `itemSpacing` to `space/*` variables, and write the same values, because binding does not repaint a literal. The bindings survive saves.
+- Hug sizing (`primaryAxisSizingMode = 'AUTO'` or `layoutSizingHorizontal = 'HUG'`) is not applied headlessly: the frame stays at its size. Resize the master to its padding plus its children and gaps.
+- An instance created in the same script as its master is saved with its children at 0,0, until a later save lays them out. Save the master first and create instances in a later script.
+
+```js
+// Script 1: the master.
+const variable = (name) =>
+  figma.getLocalVariables().find((item) => item.name === name);
+const button = figma.createComponent();
+button.name = 'Button/default';
+button.layoutMode = 'HORIZONTAL';
+const icon = figma.createRectangle();
+icon.name = 'icon';
+icon.resize(16, 16);
+const label = figma.createText();
+label.name = 'label';
+label.characters = 'Save';
+label.resize(48, 20);
+button.appendChild(icon);
+button.appendChild(label);
+for (const field of ['paddingLeft', 'paddingRight'])
+  figma.bindVariable(button.id, field, variable('space/md').id);
+for (const field of ['paddingTop', 'paddingBottom', 'itemSpacing'])
+  figma.bindVariable(button.id, field, variable('space/sm').id);
+button.paddingLeft = button.paddingRight = 16;
+button.paddingTop = button.paddingBottom = button.itemSpacing = 8;
+button.resize(16 + 16 + 8 + 48 + 16, 8 + 20 + 8);
+```
+
+```js
+// Script 2, after the first one is saved: the instances.
+const button = figma.root
+  .findAll((node) => node.name === 'Button/default')
+  .find((node) => node.type === 'COMPONENT');
+const screen = figma.currentPage.findOne((node) => node.name === 'home');
+const instance = button.createInstance();
+screen.appendChild(instance);
+instance.x = 20;
+instance.y = 20;
+```
+
+Changing a bound spacing variable with `system apply` updates the padding and gaps of the master and its instances, but not their size, since hug sizing is not applied. Resize the master afterwards; resizing its root does not reach existing instances, so resize them too and check the render.
 
 ## Variables, components, and assets
 
