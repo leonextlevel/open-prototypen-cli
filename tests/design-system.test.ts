@@ -993,6 +993,72 @@ it('checks the contrast of declared color pairs against WCAG thresholds', async 
   }
 }, 60000);
 
+it('warns about low text contrast on screens and masters, including bound fills', async () => {
+  const root = fixture();
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'tokens:',
+      "tokens:\n  - name: color.muted\n    type: COLOR\n    value: '#959595'",
+    ),
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const solid = (hex, opacity = 1) => [{ type: 'SOLID', color: {
+      r: parseInt(hex.slice(1, 3), 16) / 255, g: parseInt(hex.slice(3, 5), 16) / 255,
+      b: parseInt(hex.slice(5, 7), 16) / 255, a: 1 }, opacity, visible: true }];
+    const screen = figma.createFrame(); screen.name = 'screen'; screen.resize(600, 400);
+    screen.fills = solid('#FFFFFF');
+    const text = (parent, name, hex, size, x, y, style = 'Regular') => {
+      const node = figma.createText(); node.name = name;
+      node.fontName = { family: 'Inter', style }; node.characters = name;
+      node.fontSize = size; node.fills = solid(hex); node.resize(200, 30);
+      parent.appendChild(node); node.x = x; node.y = y;
+      return node;
+    };
+    text(screen, 'gray', '#777777', 16, 10, 10);
+    const bound = text(screen, 'bound', '#000000', 16, 10, 50);
+    figma.bindVariable(bound.id, 'fills/0/color', figma.getLocalVariables().find((item) => item.name === 'color.muted').id);
+    text(screen, 'large-pass', '#949494', 24, 10, 90);
+    text(screen, 'large-fail', '#959595', 24, 10, 130);
+    text(screen, 'bold-large', '#949494', 19, 10, 170, 'Bold');
+    text(screen, 'bold-small', '#949494', 18, 10, 210, 'Bold');
+    const scrim = figma.createRectangle(); scrim.resize(220, 40); scrim.fills = solid('#000000', 0.5);
+    screen.appendChild(scrim); scrim.x = 300; scrim.y = 5;
+    text(screen, 'on-scrim', '#FFFFFF', 16, 310, 10);
+    const partial = figma.createRectangle(); partial.resize(50, 20); partial.fills = solid('#000000');
+    screen.appendChild(partial); partial.x = 300; partial.y = 60;
+    text(screen, 'partial', '#FFFFFF', 16, 310, 55);
+    const group = figma.createFrame(); group.name = 'faded'; group.resize(250, 50); group.opacity = 0.5;
+    screen.appendChild(group); group.x = 300; group.y = 120;
+    text(group, 'faded-text', '#000000', 16, 5, 5);
+    const card = figma.createComponent(); card.name = 'Card/default'; card.resize(250, 50); card.fills = solid('#FFFFFF');
+    card.x = 700; text(card, 'card-gray', '#777777', 16, 5, 5);
+    const bare = figma.createComponent(); bare.name = 'Bare/default'; bare.resize(250, 50); bare.fills = [];
+    bare.x = 1000; text(bare, 'bare-gray', '#777777', 16, 5, 5);
+  `,
+    true,
+  );
+  const frame = inspectCanvas(root).tree.find((node) => node.name === 'screen');
+  const result = validateCanvas(root, { home: frame?.id ?? '' });
+  expect(
+    result.warnings
+      .filter((warning) => warning.code.startsWith('text-contrast'))
+      .map((warning) => warning.message),
+  ).toEqual([
+    'Screen home: text "gray" is #777777 on #FFFFFF, 4.47:1, below the 4.5:1 WCAG 2.2 requires for text',
+    'Screen home: text "bound" is #959595 on #FFFFFF, 2.99:1, below the 4.5:1 WCAG 2.2 requires for text',
+    'Screen home: text "large-fail" is #959595 on #FFFFFF, 2.99:1, below the 3:1 WCAG 2.2 requires for large text',
+    'Screen home: text "bold-small" is #949494 on #FFFFFF, 3.03:1, below the 4.5:1 WCAG 2.2 requires for text',
+    'Screen home: text "on-scrim" is #FFFFFF on #808080, 3.97:1, below the 4.5:1 WCAG 2.2 requires for text',
+    'Master Card/default: text "card-gray" is #777777 on #FFFFFF, 4.47:1, below the 4.5:1 WCAG 2.2 requires for text',
+    '2 text nodes were not checked for contrast because their background is not a plain solid color behind them (an image, gradient, translucent group, or partial overlap); review them in the renders',
+  ]);
+  expect(result.summary.textContrast).toEqual({ checked: 8, unchecked: 2 });
+}, 60000);
+
 it('chooses a neutral page background slightly apart from every token color', () => {
   const root = fixture();
   const system = (colors: string[], extra = '') => {

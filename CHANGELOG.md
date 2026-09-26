@@ -32,6 +32,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The design skill has an accessibility reference with the WCAG 2.2 criteria that affect prototypes, applied while defining the system, and the audit skill explains which OpenPencil lint results to trust. ([#43](https://github.com/leonextlevel/open-prototypen-cli/issues/43))
 - `prototype` and `validate canvas` warn `small-target` about action hotspots smaller than 24×24 px unless the WCAG 2.5.8 spacing exception applies, taking actions that are never active together into account. ([#45](https://github.com/leonextlevel/open-prototypen-cli/issues/45))
 - `system.yaml` accepts an optional `contrast` list of color pairs with their use, and `system apply`, `inspect system`, and `validate canvas` warn `contrast-pair` when a pair falls below its WCAG 2.2 threshold. ([#46](https://github.com/leonextlevel/open-prototypen-cli/issues/46))
+- `validate canvas` warns `text-contrast` about text in screens and masters below the WCAG 2.2 thresholds, including text whose fill is bound to a variable, and counts text whose background it cannot determine as unchecked. ([#47](https://github.com/leonextlevel/open-prototypen-cli/issues/47))
 
 ### Changed
 

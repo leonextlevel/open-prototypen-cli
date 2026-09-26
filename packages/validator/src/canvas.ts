@@ -1,6 +1,8 @@
 import { loadConfig } from '../../core/src/index.js';
 import {
+  contrastRatio,
   contrastWarnings,
+  hexColor,
   pageBackground,
   readDesignSystem,
   type DesignSystem,
@@ -18,6 +20,7 @@ import {
   INTERNAL_PAGE,
   inspectNativeSystem,
   SYSTEM_COLLECTION,
+  textContrastSamples,
   type NativeNode,
   type NativeSystem,
 } from '../../openpencil/src/system.js';
@@ -34,6 +37,8 @@ export type CanvasValidation = {
     boundTokens: number;
     components: number;
     instances: number;
+    // Text nodes checked for contrast, and those whose background could not be determined.
+    textContrast: { checked: number; unchecked: number };
   };
 };
 
@@ -174,6 +179,60 @@ function insideComponent(
     seen.add(id);
   }
   return false;
+}
+
+// WCAG 2.2 treats text of at least 24 px, or 18.66 px when bold, as large.
+function textContrastWarnings(
+  project: string,
+  screenFrames: Record<string, string>,
+  components: NativeNode[],
+  nodes: Map<string, NativeNode>,
+  summary: CanvasValidation['summary'],
+): CanvasFinding[] {
+  const labels = new Map<string, string>();
+  for (const [screen, id] of Object.entries(screenFrames))
+    if (nodes.has(id))
+      labels.set(
+        id,
+        labels.has(id) ? `${labels.get(id)}, ${screen}` : `Screen ${screen}`,
+      );
+  const masters = components.filter(
+    (node) => pageOf(node, nodes)?.name !== INTERNAL_PAGE,
+  );
+  for (const master of masters) labels.set(master.id, `Master ${master.name}`);
+  if (!labels.size) return [];
+  // A master without its own background takes the screen's, which the screen check covers.
+  const samples = textContrastSamples(
+    project,
+    [...labels.keys()],
+    masters.map((master) => master.id),
+  );
+  const warnings: CanvasFinding[] = [];
+  let unchecked = 0;
+  for (const sample of samples) {
+    if ('unchecked' in sample) {
+      unchecked++;
+      continue;
+    }
+    summary.textContrast.checked++;
+    const large =
+      sample.fontSize >= 24 ||
+      (sample.fontSize >= 18.66 && sample.fontWeight >= 700);
+    const required = large ? 3 : 4.5;
+    const ratio = contrastRatio(sample.foreground, sample.background);
+    if (ratio < required)
+      warnings.push({
+        code: 'text-contrast',
+        message: `${labels.get(sample.root)}: text "${sample.text || sample.name}" is ${hexColor(sample.foreground)} on ${hexColor(sample.background)}, ${(Math.floor(ratio * 100) / 100).toFixed(2)}:1, below the ${required}:1 WCAG 2.2 requires for ${large ? 'large text' : 'text'}`,
+      });
+  }
+  summary.textContrast.unchecked = unchecked;
+  if (unchecked)
+    warnings.push({
+      code: 'text-contrast-unchecked',
+      message: `${unchecked} text nodes were not checked for contrast because their background is not a plain solid color behind them (an image, gradient, translucent group, or partial overlap); review them in the renders`,
+    });
+  return warnings;
 }
 
 // Masters are named <component>/<state>; the component name may itself contain /.
@@ -326,7 +385,13 @@ export function validateCanvas(
 ): CanvasValidation {
   loadConfig(project);
   const findings: CanvasFinding[] = [];
-  const summary = { tokens: 0, boundTokens: 0, components: 0, instances: 0 };
+  const summary = {
+    tokens: 0,
+    boundTokens: 0,
+    components: 0,
+    instances: 0,
+    textContrast: { checked: 0, unchecked: 0 },
+  };
   let system: ReturnType<typeof readDesignSystem>;
   try {
     system = readDesignSystem(project);
@@ -492,6 +557,13 @@ export function validateCanvas(
     findings,
     warnings: [
       ...contrastWarnings(system),
+      ...textContrastWarnings(
+        project,
+        screenFrames,
+        components,
+        nodes,
+        summary,
+      ),
       ...sampleWarnings,
       ...missingFonts(project).map(({ family, style, nodes: users }) => ({
         code: 'font-substitution',
