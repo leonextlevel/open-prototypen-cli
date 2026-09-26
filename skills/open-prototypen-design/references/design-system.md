@@ -69,7 +69,7 @@ contrast:
 
 ## Icons and artwork
 
-- **Default.** Use SVG for interface icons so their geometry and stroke stay editable. Keep view boxes, weight, and optical alignment consistent, and inspect the imported vectors and the render. Do not substitute punctuation glyphs for designed icons.
+- **Default.** Use SVG for interface icons so their geometry and stroke stay editable, and inspect the imported vectors and the render. When an icon helps, how to keep one family consistent, and when to use imagery are in [iconography and imagery](iconography-and-imagery.md). Do not substitute punctuation glyphs for designed icons.
 - **Constraint.** Record the source and license of external artwork. For generated SVG, record that it was made for the project and inspect the markup and the render. Do not introduce remote image dependencies into the `.fig`.
 
 ## Final review

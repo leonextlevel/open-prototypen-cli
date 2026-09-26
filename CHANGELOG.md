@@ -34,6 +34,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `system.yaml` accepts an optional `contrast` list of color pairs with their use, and `system apply`, `inspect system`, and `validate canvas` warn `contrast-pair` when a pair falls below its WCAG 2.2 threshold. ([#46](https://github.com/leonextlevel/open-prototypen-cli/issues/46))
 - `validate canvas` warns `text-contrast` about text in screens and masters below the WCAG 2.2 thresholds, including text whose fill is bound to a variable, and counts text whose background it cannot determine as unchecked. ([#47](https://github.com/leonextlevel/open-prototypen-cli/issues/47))
 - `system.yaml` accepts optional `scales` for spacing and radius token prefixes, and `validate canvas` warns `off-scale-spacing` and `off-scale-radius` about unbound gaps, paddings, and radii in screens and masters outside them, grouped by value. ([#48](https://github.com/leonextlevel/open-prototypen-cli/issues/48))
+- The design skill has references on iconography and imagery, data visualization, and motion, each read only when a product uses them. ([#49](https://github.com/leonextlevel/open-prototypen-cli/issues/49))
 
 ### Changed
 
