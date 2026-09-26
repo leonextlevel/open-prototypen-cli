@@ -278,9 +278,25 @@ export function importSvg(
     project,
     `
     const { importSVG } = await import('@open-pencil/core/tools');
-    return await importSVG.execute(figma, {
+    const result = await importSVG.execute(figma, {
       svg: ${JSON.stringify(svg)}, name: ${JSON.stringify(importedName)}
-    });`,
+    });
+    // OpenPencil maps stroke-linecap and stroke-linejoin onto each stroke, but saves only the
+    // node-level strokeCap and strokeJoin, so copy them there before saving.
+    const graph = figma.graph;
+    const visit = (id) => {
+      const node = graph.getNode(id);
+      if (!node) return;
+      const stroke = node.strokes?.[0];
+      if (node.type === 'VECTOR' && stroke && (stroke.cap || stroke.join))
+        graph.updateNode(id, {
+          ...(stroke.cap ? { strokeCap: stroke.cap } : {}),
+          ...(stroke.join ? { strokeJoin: stroke.join } : {}),
+        });
+      for (const child of node.childIds ?? []) visit(child);
+    };
+    if (result?.id) visit(result.id);
+    return result;`,
     true,
   ) as { id?: string; name?: string; type?: string; error?: string };
   if (result.error || !result.id || !result.name || !result.type)

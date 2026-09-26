@@ -215,6 +215,24 @@ it('imports an SVG as editable vectors and preserves changed installed reference
   expect(readFileSync(review, 'utf8')).toContain('Local review note.');
 }, 60000);
 
+it('keeps round stroke caps and joins of imported SVG icons after saving', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  const svg = join(root, 'check.svg');
+  writeFileSync(
+    svg,
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  );
+  importSvg(root, svg, 'check-icon');
+  const strokes = evalDocument(
+    root,
+    `return [...figma.graph.getAllNodes()]
+      .filter((node) => node.type === 'VECTOR')
+      .map((node) => [node.strokeCap, node.strokeJoin]);`,
+  );
+  expect(strokes).toEqual([['ROUND', 'ROUND']]);
+}, 60000);
+
 it('requires manifest components, bound tokens, and linked screen instances before compiling', async () => {
   const root = fixture();
   await applyDesignSystem(root);

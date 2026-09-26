@@ -20,6 +20,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 
 - When several active actions share a node, the prototype renders a single hotspot for the one declared last, so keyboard and screen reader users reach the same action as pointer users. ([#3](https://github.com/leonextlevel/open-prototypen-cli/issues/3))
 - Keyboard focus no longer falls back to the start of the page after a prototype action: it moves to the new screen's title, stays on the hotspot after a `set-state`, and returns to the opening hotspot when an overlay closes. ([#4](https://github.com/leonextlevel/open-prototypen-cli/issues/4))
+- `svg import` keeps round stroke caps and joins, so outline icons no longer render with square ends and sharp corners after saving. ([#9](https://github.com/leonextlevel/open-prototypen-cli/issues/9))
 
 ## [0.2.0] - 2026-09-25
 
