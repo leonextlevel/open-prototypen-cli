@@ -23,6 +23,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - A screen in `interactions.yaml` can derive from another screen with `base` and `overrides` for text and visibility; `render` applies them to a temporary copy of the `.fig`, so each state no longer needs its own cloned frame. ([#24](https://github.com/leonextlevel/open-prototypen-cli/issues/24))
 - The design skill has a color reference on role-based palettes, tonal scales, accent discipline, semantic separation, WCAG contrast, and dark themes. ([#34](https://github.com/leonextlevel/open-prototypen-cli/issues/34))
 - `render` loads project fonts from `docs/design/assets/fonts/<Family>/<Style>.ttf` or `.otf` without the network, `render --web-fonts` fetches missing families from web font providers, and `render` and `validate canvas` warn `font-substitution` about faces whose text would be missing from renders. ([#36](https://github.com/leonextlevel/open-prototypen-cli/issues/36))
+- The design skill has a typography reference on typeface choice, hierarchy, reading comfort, numeric type, localization, and which faces render. ([#35](https://github.com/leonextlevel/open-prototypen-cli/issues/35))
 
 ### Changed
 
