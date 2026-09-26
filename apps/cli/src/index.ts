@@ -13,7 +13,10 @@ import {
   initProject,
   installSkills,
 } from '../../../packages/harness/src/index.js';
-import { inspectCanvas } from '../../../packages/openpencil/src/index.js';
+import {
+  evalScript,
+  inspectCanvas,
+} from '../../../packages/openpencil/src/index.js';
 import {
   applyDesignSystem,
   importSvg,
@@ -283,6 +286,22 @@ program
         options.json,
       ),
   );
+program
+  .command('eval <script>')
+  .description(
+    'Run a JavaScript file on the project .fig with helpers available as op',
+  )
+  .option('--write', 'Save the changes to the .fig')
+  .option('--json', 'Machine-readable JSON')
+  .action((script: string, options: { write?: boolean; json?: boolean }) => {
+    const result = evalScript(
+      root(),
+      readFileSync(resolve(script), 'utf8'),
+      options.write,
+    );
+    if (result !== undefined || options.json)
+      output(result ?? null, options.json);
+  });
 const ref = program
   .command('ref')
   .description('Manage stable node references used by interactions.yaml');

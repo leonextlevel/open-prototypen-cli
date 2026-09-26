@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { workspace } from '../../core/src/index.js';
+import { packageRoot } from '../../schemas/src/index.js';
 
 export type DesignNode = {
   id: string;
@@ -60,6 +61,19 @@ function evalFile(file: string, code: string, write = false): unknown {
     code,
   );
   return result.trim() ? JSON.parse(result) : undefined;
+}
+// Runs an agent-written script on the project document with the helpers from
+// runtime/openpencil/helpers.js available as `op`.
+export function evalScript(
+  project: string,
+  script: string,
+  write = false,
+): unknown {
+  const helpers = readFileSync(
+    join(packageRoot(), 'runtime/openpencil/helpers.js'),
+    'utf8',
+  );
+  return evalDocument(project, `${helpers}\n${script}`, write);
 }
 export function inspectCanvas(project: string): {
   document: string;

@@ -18,6 +18,7 @@ import {
 import { initProject, installSkills } from '../packages/harness/src/index.js';
 import {
   evalDocument,
+  evalScript,
   figPath,
   inspectCanvas,
   relativeBounds,
@@ -360,6 +361,71 @@ it('generates icon size and color variants bound to color tokens', async () => {
       parseVariants('16:color/accent,16:color/accent'),
     ),
   ).toThrow('Two variants would both be named icon/y/16-accent');
+}, 60000);
+
+it('runs build scripts with helpers that resolve names and references', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  const created = evalScript(
+    root,
+    `
+    const system = op.page('Design System', { create: true });
+    figma.currentPage = system;
+    const row = figma.createComponent();
+    row.name = 'BookRow/default';
+    row.layoutMode = 'VERTICAL';
+    row.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 }, opacity: 1 }];
+    op.bind(row, 'fills/0/color', 'color.surface');
+    op.bind(row, 'itemSpacing', 'space.md');
+    const title = figma.createText(); title.name = 'title'; title.characters = 'Title';
+    title.resize(200, 24); row.appendChild(title);
+    row.resize(300, 80);
+    const spot = op.freeSpot(system);
+    figma.currentPage = op.page('Page 1');
+    const screen = figma.createFrame(); screen.name = 'collection'; screen.resize(390, 760);
+    op.setRef(screen, 'collection');
+    return spot;`,
+    true,
+  );
+  expect(created).toEqual({ x: 332, y: 0 });
+  // Instances go in a later script, after the master was saved and laid out.
+  evalScript(
+    root,
+    `
+    const row = op.place('BookRow/default', op.byRef('collection'), 20, 100, {
+      title: { characters: 'Dom Casmurro' },
+    });
+    op.setRef(row, 'first-book');
+    return row.id;`,
+    true,
+  );
+  const native = inspectNativeSystem(root);
+  const variable = (name: string) =>
+    native.variables.find((entry) => entry.name === name)?.id;
+  const master = native.nodes.find((node) => node.type === 'COMPONENT');
+  expect(master?.boundVariables).toEqual({
+    'fills/0/color': variable('color.surface'),
+    itemSpacing: variable('space.md'),
+  });
+  const instance = native.nodes.find((node) => node.type === 'INSTANCE');
+  expect(instance?.componentId).toBe(master?.id);
+  expect(
+    native.nodes.find(
+      (node) => node.parentId === instance?.id && node.type === 'TEXT',
+    )?.text,
+  ).toBe('Dom Casmurro');
+  expect(
+    evalScript(
+      root,
+      `return [op.byRef('first-book').name, op.token('space.md').name, figma.graph.getNode(op.master('BookRow/default').id).itemSpacing];`,
+    ),
+  ).toEqual(['BookRow/default', 'space.md', 12]);
+  expect(() => evalScript(root, `op.master('Missing');`)).toThrow(
+    'Expected one component master named Missing; found 0',
+  );
+  expect(() =>
+    evalScript(root, `op.setRef(op.page('Page 1').children[0], 'first-book');`),
+  ).toThrow('Reference first-book already belongs to BookRow/default');
 }, 60000);
 
 it('keeps round stroke caps and joins of imported SVG icons after saving', async () => {

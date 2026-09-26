@@ -2,6 +2,43 @@
 
 Use this reference when editing the `.fig` with `eval <file.fig> --stdin --write` from the npm CLI pinned by Open Prototypen (`@open-pencil/cli` 0.15.1). The script API resembles the Figma plugin API, but a headless document behaves differently from the desktop editor. Verify anything not listed here with a small script on a copy of the document before relying on it.
 
+## Build scripts and helpers
+
+Run scripts with `open-prototypen eval <script.js> --write`, which uses the pinned OpenPencil on the project `.fig` and injects helpers as `op`; without `--write` the changes are discarded, and `--json` prints the script's return value. The helpers resolve nodes by name or reference, so a script does not depend on IDs read before a save:
+
+- `op.token(name)` returns the native variable of a declared token.
+- `op.bind(node, field, tokenName)` binds a field such as `'fills/0/color'`, `'strokes/0/color'`, `'itemSpacing'`, or `'paddingLeft'` and writes the token's value.
+- `op.master(name)` returns the one component master with that name; `op.page(name)` returns a page, and `op.page(name, { create: true })` adds it when missing.
+- `op.byRef(ref)` and `op.setRef(node, ref)` read and assign stable references; `setRef` rejects a reference that another node already has.
+- `op.freeSpot(page)` returns `{ x, y }` to the right of the page's content.
+- `op.place(master, parent, x, y, overrides)` creates an instance of a master or master name inside a parent, and applies `overrides` such as `{ title: { characters: 'Dom Casmurro' } }` to named layers.
+
+A master and its instances belong in separate scripts, because an instance created in the master's script is saved with stale child positions (see below):
+
+```js
+// masters.js
+const system = op.page('Design System', { create: true });
+figma.currentPage = system;
+const row = figma.createComponent();
+row.name = 'BookRow/default';
+row.fills = [{ type: 'SOLID', color: { r: 1, g: 1, b: 1, a: 1 }, opacity: 1 }];
+op.bind(row, 'fills/0/color', 'color/surface');
+const title = figma.createText();
+title.name = 'title';
+title.characters = 'Title';
+title.resize(200, 24);
+row.appendChild(title);
+row.resize(300, 80);
+```
+
+```js
+// screens.js, run after masters.js was saved
+const row = op.place('BookRow/default', op.byRef('collection'), 20, 100, {
+  title: { characters: 'Dom Casmurro' },
+});
+op.setRef(row, 'first-book');
+```
+
 ## Node IDs and references
 
 - IDs are renumbered in document order on every save. Inserting or removing one node, even on another page, changes the IDs of later nodes, so an ID read before a write is not valid after it. Re-run `open-prototypen inspect canvas --json` after each write that adds or removes nodes.
