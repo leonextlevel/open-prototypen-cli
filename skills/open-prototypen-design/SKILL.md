@@ -15,6 +15,7 @@ Read a reference only when the decision in front of you needs it:
 - [Color](references/color.md): when choosing palette roles and scales, placing the accent, adding a dark theme, or checking contrast.
 - [Typography](references/typography.md): when choosing typefaces, defining the type scale, setting text for reading or data, or checking that type renders.
 - [Layout](references/layout.md): when setting a screen's structure, choosing spacing and density, grouping content, or defining radius, borders, and elevation.
+- [Design review](references/review.md): when critiquing your renders before handing them to component review.
 - [Design system contract and page](references/design-system.md): when writing `system.yaml`, building the `Design System` page, choosing components and states, or importing icons.
 - [Headless OpenPencil](references/openpencil-headless.md): before scripting edits to the `.fig`.
 
@@ -28,7 +29,7 @@ The official npm CLI supports `import <html> -o <file.fig>` for editable convers
 
 Give each screen frame and action node a stable reference with `open-prototypen ref set <node-id>=<ref> ...`, using current IDs from `open-prototypen inspect canvas --json`, and write those references, not node IDs, in `interactions.yaml`. Reference instances rather than layers inside them; select a layer inside an instance with `part`. Represent every flow state that matters, including errors and deadlines, as a screen reachable through actions. When a state differs from another screen only in text or in which nodes are visible, declare it as a variant instead of cloning the frame, so the states cannot drift apart: give the screen `base: <screen key>` instead of `frame`, and `overrides` with `text` (reference, or `<ref>:<part>` inside an instance, mapped to new characters), `hidden`, and `shown` (lists of references). `render` applies them to a temporary copy of the `.fig`; hotspots use the base frame, and actions on hidden nodes are rejected; use `set-state` and `when` to simulate outcomes the prototype cannot compute, and treat `unreachable-screen` warnings as missing paths.
 
-Run `render` and `prototype` after the design is ready, then hand the result to the component-review skill in a separate agent context for correction before accepting it. If `validate canvas` or `prototype` already fails because a screen lacks a linked instance, run the review first.
+Run `render` after the design is ready and critique your own PNGs with [the design review questions](references/review.md), including the intentionality pass, against the direction; refine and render again until they hold. Then run `prototype` and hand the result to the component-review skill in a separate agent context for correction before accepting it. If `validate canvas` or `prototype` already fails because a screen lacks a linked instance, run the review first.
 
 Minimal `interactions.yaml`:
 
