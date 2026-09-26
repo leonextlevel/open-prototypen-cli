@@ -381,6 +381,48 @@ it('warns about instances on undeclared screens and unused masters', async () =>
   ]);
 }, 60000);
 
+it('warns about tokens bound only to Design System samples', async () => {
+  const root = fixture();
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'tokens:',
+      "tokens:\n  - name: color.text\n    type: COLOR\n    value: '#000000'\n  - name: color.border\n    type: COLOR\n    value: '#cccccc'",
+    ),
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const variable = (name) => figma.getLocalVariables().find((item) => item.name === name);
+    const paint = { type: 'SOLID', color: { r: 0, g: 0, b: 0, a: 1 }, opacity: 1 };
+    const flow = figma.currentPage;
+    const screen = figma.createFrame(); screen.name = 'collection'; screen.resize(390, 760);
+    const label = figma.createRectangle(); label.fills = [paint]; screen.appendChild(label);
+    figma.bindVariable(label.id, 'fills/0/color', variable('color.text').id);
+    const system = figma.createPage(); system.name = 'Design System';
+    figma.currentPage = system;
+    const row = figma.createComponent(); row.name = 'BookRow/default'; row.fills = [paint];
+    figma.bindVariable(row.id, 'fills/0/color', variable('color.surface').id);
+    const divider = figma.createRectangle(); divider.fills = [paint]; row.appendChild(divider);
+    figma.bindVariable(divider.id, 'fills/0/color', variable('color.border').id);
+    const sample = figma.createFrame(); sample.name = 'spacing sample';
+    sample.layoutMode = 'HORIZONTAL'; sample.itemSpacing = 12;
+    figma.bindVariable(sample.id, 'itemSpacing', variable('space.md').id);
+    const swatch = figma.createRectangle(); swatch.fills = [paint];
+    figma.bindVariable(swatch.id, 'fills/0/color', variable('color.text').id);
+  `,
+    true,
+  );
+  expect(
+    validateCanvas(root, {})
+      .warnings.filter((warning) => warning.code === 'token-sample-only')
+      .map((warning) => warning.message),
+  ).toEqual([
+    'Native variable space.md is bound only to samples on Design System; bind it in component masters or screens too',
+  ]);
+}, 60000);
+
 it('warns about text that repeats a master name on the Design System page', async () => {
   const root = fixture();
   await applyDesignSystem(root);
