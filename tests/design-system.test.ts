@@ -232,6 +232,42 @@ it('counts components nested inside other component instances as screen usage', 
   });
 }, 60000);
 
+it('warns about text that repeats a master name on the Design System page', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const flow = figma.currentPage;
+    const system = figma.createPage(); system.name = 'Design System';
+    figma.currentPage = system;
+    const text = (value, parent) => {
+      const node = figma.createText(); node.characters = value;
+      if (parent) parent.appendChild(node);
+      return node;
+    };
+    const row = figma.createComponent(); row.name = 'BookRow/default'; row.resize(300, 80);
+    text('BookRow/default', row);
+    const selected = figma.createComponent(); selected.name = 'BookRow/selected'; selected.resize(300, 80);
+    text('BookRow/default');
+    text('BookRow / selected');
+    text('BookRow');
+    text('Rows');
+    text('color.surface  #112233');
+    figma.currentPage = flow;
+    text('BookRow/selected');
+  `,
+    true,
+  );
+  const labels = validateCanvas(root, {}).warnings.filter(
+    (warning) => warning.code === 'master-label',
+  );
+  expect(labels.map((warning) => warning.message)).toEqual([
+    expect.stringContaining('"BookRow/default"'),
+    expect.stringContaining('"BookRow / selected"'),
+  ]);
+}, 60000);
+
 it('inspects, renders, and compiles screens across flow pages', async () => {
   const root = fixture();
   await applyDesignSystem(root);

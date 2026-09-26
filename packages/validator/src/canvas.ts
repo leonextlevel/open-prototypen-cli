@@ -109,6 +109,49 @@ function masterPageWarnings(
     }));
 }
 
+// The editor already labels every master with its name, so a loose text repeating it is noise.
+function masterLabelWarnings(
+  components: NativeNode[],
+  nodes: Map<string, NativeNode>,
+): CanvasFinding[] {
+  const normalize = (value: string) =>
+    value
+      .trim()
+      .replace(/\s*\/\s*/g, '/')
+      .toLowerCase();
+  const masters = new Set(components.map((node) => normalize(node.name)));
+  return [...nodes.values()]
+    .filter(
+      (node) =>
+        node.type === 'TEXT' &&
+        node.text !== undefined &&
+        masters.has(normalize(node.text)) &&
+        pageOf(node, nodes)?.name === DESIGN_SYSTEM_PAGE &&
+        !insideComponent(node, nodes),
+    )
+    .map((node) => ({
+      code: 'master-label',
+      message: `Text "${node.text?.trim()}" on ${DESIGN_SYSTEM_PAGE} repeats a component master's name, which the editor already shows; keep text for group headings and token samples`,
+    }));
+}
+
+function insideComponent(
+  node: NativeNode,
+  nodes: Map<string, NativeNode>,
+): boolean {
+  const seen = new Set<string>();
+  for (
+    let id = node.parentId;
+    id && !seen.has(id);
+    id = nodes.get(id)?.parentId ?? null
+  ) {
+    const type = nodes.get(id)?.type;
+    if (type === 'COMPONENT' || type === 'INSTANCE') return true;
+    seen.add(id);
+  }
+  return false;
+}
+
 export function validateCanvas(
   project: string,
   screenFrames: Record<string, string>,
@@ -254,7 +297,10 @@ export function validateCanvas(
     artifact: 'canvas',
     valid: findings.length === 0,
     findings,
-    warnings: masterPageWarnings(components, nodes),
+    warnings: [
+      ...masterPageWarnings(components, nodes),
+      ...masterLabelWarnings(components, nodes),
+    ],
     summary,
   };
 }

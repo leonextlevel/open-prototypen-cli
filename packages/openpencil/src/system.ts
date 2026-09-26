@@ -24,6 +24,8 @@ export type NativeNode = {
   parentId: string | null;
   componentId: string | null;
   boundVariables: Record<string, string>;
+  // Present only on TEXT nodes.
+  text?: string;
 };
 export type NativeSystem = {
   document: string;
@@ -56,7 +58,8 @@ export function inspectNativeSystem(project: string): NativeSystem {
       nodes: [...figma.graph.getAllNodes()].map((node) => ({
         id: node.id, name: node.name, type: node.type,
         parentId: node.parentId, componentId: node.componentId,
-        boundVariables: node.boundVariables
+        boundVariables: node.boundVariables,
+        text: node.type === 'TEXT' ? node.text : undefined
       }))
     };`,
   ) as Omit<NativeSystem, 'document'>;
