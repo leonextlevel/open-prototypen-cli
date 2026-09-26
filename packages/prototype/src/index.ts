@@ -98,7 +98,17 @@ const interactionsSchema = z.object({
   screens: z.record(
     id,
     z.object({
-      frame: z.string().min(1),
+      // A screen has its own frame, or derives from the frame of a base screen with overrides.
+      frame: z.string().min(1).optional(),
+      base: id.optional(),
+      overrides: z
+        .object({
+          text: z.record(z.string(), z.string()).default({}),
+          hidden: z.array(z.string()).default([]),
+          shown: z.array(z.string()).default([]),
+        })
+        .strict()
+        .optional(),
       title: z.string().min(1),
       content: z.string().min(1),
       actions: z.record(id, actionSchema).default({}),
@@ -116,6 +126,16 @@ export function readInteractions(project: string): Interactions {
   const data = interactionsSchema.parse(YAML.parse(readFileSync(path, 'utf8')));
   if (!data.screens[data.initialScreen])
     throw new Error(`Unknown initial screen: ${data.initialScreen}`);
+  for (const [screen, entry] of Object.entries(data.screens)) {
+    if (Boolean(entry.frame) === Boolean(entry.base))
+      throw new Error(`Screen ${screen} needs either a frame or a base`);
+    if (entry.overrides && !entry.base)
+      throw new Error(`Screen ${screen} has overrides but no base`);
+    if (entry.base && !data.screens[entry.base]?.frame)
+      throw new Error(
+        `Screen ${screen} has base ${entry.base}, which is not a screen with its own frame`,
+      );
+  }
   for (const [screen, entry] of Object.entries(data.screens))
     for (const [name, action] of Object.entries(entry.actions)) {
       if ('target' in action && action.target && !data.screens[action.target])
@@ -152,6 +172,13 @@ type ResolvedScreen = {
   frame: DesignNode;
   bounds: Bounds;
   actions: Record<string, RuntimeAction>;
+  overrides?: ResolvedOverrides;
+};
+// Overrides of a variant screen, by node ID in the base frame.
+type ResolvedOverrides = {
+  text: { id: string; value: string }[];
+  hidden: string[];
+  shown: string[];
 };
 
 function contextual<T>(context: string, resolve: () => T): T {
@@ -178,21 +205,81 @@ function legacyWarning(context: string, reference: string): PrototypeWarning[] {
       ]
     : [];
 }
+// The frame reference of a screen, or of its base for a variant.
+function frameReference(interactions: Interactions, name: string): string {
+  const entry = interactions.screens[name];
+  const frame = entry?.base
+    ? interactions.screens[entry.base]?.frame
+    : entry?.frame;
+  if (!frame) throw new Error(`Unknown screen: ${name}`);
+  return frame;
+}
 function resolveScreenFrame(
   index: RefIndex,
   name: string,
-  entry: Interactions['screens'][string],
+  interactions: Interactions,
 ): PlacedNode {
-  return contextual(`Screen ${name}`, () => resolveFrame(index, entry.frame));
+  return contextual(`Screen ${name}`, () =>
+    resolveFrame(index, frameReference(interactions, name)),
+  );
+}
+// Override targets are references, or <ref>:<part> for a layer inside a referenced instance.
+function resolveOverrides(
+  index: RefIndex,
+  name: string,
+  frame: PlacedNode,
+  overrides: NonNullable<Interactions['screens'][string]['overrides']>,
+): ResolvedOverrides & { hiddenIds: Set<string> } {
+  const target = (key: string): PlacedNode =>
+    contextual(`Screen ${name} override ${key}`, () => {
+      const separator = key.indexOf(':');
+      const reference = separator < 0 ? key : key.slice(0, separator);
+      const placed = resolveNode(index, reference);
+      if (placed.frame.id !== frame.node.id || placed.node === frame.node)
+        throw new Error(
+          `${describeNode(placed.node)} is not inside frame ${describeNode(frame.node)}`,
+        );
+      return separator < 0
+        ? placed
+        : resolvePart(placed, key.slice(separator + 1));
+    });
+  const text = Object.entries(overrides.text).map(([key, value]) => {
+    const placed = target(key);
+    if (placed.node.type !== 'TEXT')
+      throw new Error(
+        `Screen ${name} override ${key}: ${describeNode(placed.node)} is not a text node`,
+      );
+    return { id: placed.node.id, value };
+  });
+  const hidden = overrides.hidden.map((key) => target(key).node);
+  const shown = overrides.shown.map((key) => target(key).node.id);
+  const both = hidden.find((node) => shown.includes(node.id));
+  if (both)
+    throw new Error(
+      `Screen ${name} both hides and shows ${describeNode(both)}`,
+    );
+  const hiddenIds = new Set<string>();
+  const collect = (node: DesignNode) => {
+    hiddenIds.add(node.id);
+    for (const child of node.children ?? []) collect(child);
+  };
+  hidden.forEach(collect);
+  return { text, hidden: hidden.map((node) => node.id), shown, hiddenIds };
 }
 function resolveScreen(
   index: RefIndex,
   name: string,
-  entry: Interactions['screens'][string],
+  interactions: Interactions,
   warnings: PrototypeWarning[],
 ): ResolvedScreen {
-  const frame = resolveScreenFrame(index, name, entry);
-  warnings.push(...legacyWarning(`Screen ${name}`, entry.frame));
+  const entry = interactions.screens[name];
+  if (!entry) throw new Error(`Unknown screen: ${name}`);
+  const frame = resolveScreenFrame(index, name, interactions);
+  if (entry.frame)
+    warnings.push(...legacyWarning(`Screen ${name}`, entry.frame));
+  const overrides = entry.overrides
+    ? resolveOverrides(index, name, frame, entry.overrides)
+    : undefined;
   const actions: Record<string, RuntimeAction> = {};
   const targets: { name: string; action: RuntimeAction }[] = [];
   const slots = new Map<string, string>();
@@ -205,7 +292,12 @@ function resolveScreen(
         throw new Error(
           `${describeNode(placed.node)} is not inside frame ${describeNode(frame.node)}`,
         );
-      return action.part ? resolvePart(placed, action.part) : placed;
+      const resolved = action.part ? resolvePart(placed, action.part) : placed;
+      if (overrides?.hiddenIds.has(resolved.node.id))
+        throw new Error(
+          `${describeNode(resolved.node)} is hidden in this variant`,
+        );
+      return resolved;
     });
     const bounds = {
       x: target.bounds.x - frame.bounds.x,
@@ -244,7 +336,18 @@ function resolveScreen(
     targets.push({ name: actionName, action: runtime });
   }
   warnings.push(...coveredActionWarnings(name, targets));
-  return { frame: frame.node, bounds: frame.bounds, actions };
+  return {
+    frame: frame.node,
+    bounds: frame.bounds,
+    actions,
+    ...(overrides && {
+      overrides: {
+        text: overrides.text,
+        hidden: overrides.hidden,
+        shown: overrides.shown,
+      },
+    }),
+  };
 }
 // The runtime renders only the last active action on each node, so a later action on the same node wins.
 // An earlier action is dead when that later one is active in every state where it is active.
@@ -456,9 +559,9 @@ export function resolveInteractions(
   const index = openRefs(inspectCanvas(project).tree);
   const warnings: PrototypeWarning[] = [];
   const screens = Object.fromEntries(
-    Object.entries(interactions.screens).map(([name, entry]) => [
+    Object.keys(interactions.screens).map((name) => [
       name,
-      resolveScreen(index, name, entry, warnings),
+      resolveScreen(index, name, interactions, warnings),
     ]),
   );
   return {
@@ -471,21 +574,38 @@ export function resolveInteractions(
   };
 }
 export function inspectScreen(project: string, screen: string) {
-  const entry = readInteractions(project).screens[screen];
-  if (!entry) throw new Error(`Unknown screen: ${screen}`);
   const warnings: PrototypeWarning[] = [];
   const resolved = resolveScreen(
     openRefs(inspectCanvas(project).tree),
     screen,
-    entry,
+    readInteractions(project),
     warnings,
   );
   return {
     screen,
     frame: { ...resolved.frame, bounds: resolved.bounds },
     actions: resolved.actions,
+    ...(resolved.overrides && { overrides: resolved.overrides }),
     warnings,
   };
+}
+// Applies a variant's overrides to a temporary copy of the document before its base frame is
+// exported. Overrides change no nodes' existence, so node IDs stay valid in the copy.
+function overrideScript(overrides: ResolvedOverrides): string {
+  return `
+    const overrides = ${JSON.stringify(overrides)};
+    for (const { id, value } of overrides.text) figma.getNodeById(id).characters = value;
+    for (const id of overrides.hidden) figma.getNodeById(id).visible = false;
+    for (const id of overrides.shown) figma.getNodeById(id).visible = true;
+    return true;`;
+}
+// Maps each variant screen to its base, so component checks treat a variant like its base.
+function screenBases(interactions: Interactions): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(interactions.screens).flatMap(([name, entry]) =>
+      entry.base ? [[name, entry.base]] : [],
+    ),
+  );
 }
 export function renderScreens(project: string, screen?: string): string[] {
   const interactions = readInteractions(project);
@@ -493,17 +613,22 @@ export function renderScreens(project: string, screen?: string): string[] {
     ? ([[screen, interactions.screens[screen]]] as const)
     : Object.entries(interactions.screens);
   const index = openRefs(inspectCanvas(project).tree);
-  // Resolve every frame before exporting so a stale reference cannot overwrite a good render.
+  // Resolve every frame and override before exporting so a stale reference cannot overwrite a
+  // good render.
   const frames = entries.map(([name, entry]) => {
     if (!entry) throw new Error(`Unknown screen: ${name}`);
-    return [name, resolveScreenFrame(index, name, entry)] as const;
+    const frame = resolveScreenFrame(index, name, interactions);
+    const overrides =
+      entry.overrides && resolveOverrides(index, name, frame, entry.overrides);
+    return { name, frame, overrides };
   });
-  return frames.map(([name, frame]) =>
+  return frames.map(({ name, frame, overrides }) =>
     renderFrame(
       project,
       frame.node.id,
       join(workspace(project), 'prototype/renders', `${name}.png`),
       frame.bounds,
+      overrides && overrideScript(overrides),
     ),
   );
 }
@@ -567,6 +692,12 @@ export function validatePrototypeCanvas(project: string): CanvasValidation {
   } catch (error) {
     interactionError = error instanceof Error ? error.message : String(error);
   }
+  let bases: Record<string, string> = {};
+  try {
+    bases = screenBases(readInteractions(project));
+  } catch {
+    // The interactions error is already reported.
+  }
   const result = validateCanvas(
     project,
     Object.fromEntries(
@@ -575,6 +706,7 @@ export function validatePrototypeCanvas(project: string): CanvasValidation {
         screen.frame.id,
       ]),
     ),
+    bases,
   );
   if (interactionError) {
     result.findings.push({ code: 'interactions', message: interactionError });
@@ -600,6 +732,7 @@ export function compilePrototype(project: string): {
           screen.frame.id,
         ]),
       ),
+      screenBases(interactions),
     );
     if (!validation.valid)
       throw new Error(
