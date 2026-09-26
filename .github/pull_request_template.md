@@ -11,5 +11,5 @@ Closes #<number>
 - [ ] `pnpm typecheck`, `pnpm lint`, `pnpm format:check`, and `pnpm test` pass locally
 - [ ] Behavior is tested with fixtures or an isolated project
 - [ ] Renders were inspected (visual changes only)
-- [ ] `CHANGELOG.md` has an entry under `[Unreleased]` (user-facing changes only)
+- [ ] `CHANGELOG.md` has an entry under `[Unreleased]` that links the issue (user-facing changes only)
 - [ ] Docs and skills are updated where they describe the changed behavior

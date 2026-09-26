@@ -40,7 +40,7 @@ Brief, only when relevant.
 
 ## Acceptance criteria
 
-- [ ] Verifiable outcomes, including tests, docs and skill updates, and a `CHANGELOG.md` entry under `[Unreleased]`.
+- [ ] Verifiable outcomes, including tests, docs and skill updates, and a `CHANGELOG.md` entry under `[Unreleased]` that links the issue.
 
 ## Scope and effort
 
@@ -84,6 +84,12 @@ The maintainer merges approved pull requests; GitHub then deletes the branch and
 
 ## Changelog and versions
 
-For every notable user-facing change, add a short entry under the appropriate `Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, or `Security` heading in `[Unreleased]` in `CHANGELOG.md`, in the same pull request. Skip internal-only noise. Keep entries understandable without reading commits. Use [Semantic Versioning](https://semver.org/); before `1.0.0`, call out breaking changes clearly even when the next version is a minor increment.
+For every notable user-facing change, add a short entry under the appropriate `Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, or `Security` heading in `[Unreleased]` in `CHANGELOG.md`, in the same pull request. Skip internal-only noise. Keep entries understandable without reading commits, and end each one with a full link to the issue it resolves, or several when it covers more than one; a bare `#42` is not linked in a Markdown file:
+
+```md
+- Commands run with `--json` report failures as a JSON object. ([#42](https://github.com/leonextlevel/open-prototypen-cli/issues/42))
+```
+
+Use [Semantic Versioning](https://semver.org/); before `1.0.0`, call out breaking changes clearly even when the next version is a minor increment.
 
 Do not bump versions, move changelog entries out of `[Unreleased]`, or create release tags during ordinary work. Wait until the maintainer explicitly says a version is finished. Then open a `Release vX.Y.Z` issue and prepare the release in a `chore/<issue>-release-vX.Y.Z` pull request that chooses the next version from the accumulated changelog, updates the root package version and lockfile, and closes the changelog section. After it merges, create an annotated `vX.Y.Z` tag on the resulting commit in `main`. See [the release procedure](docs/releasing.md).
