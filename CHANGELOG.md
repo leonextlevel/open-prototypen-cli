@@ -27,6 +27,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The design skill has a layout reference on layout grammar, grouping, spacing scales, hierarchy, density, radius, borders, elevation, and responsive rules, and asks for radius and elevation samples on the `Design System` page. ([#37](https://github.com/leonextlevel/open-prototypen-cli/issues/37))
 - The design skill has a design review reference with questions on product fit, intentionality, genericity, cross-screen consistency, and craft; the designer critiques its renders with it before component review, the audit uses it, and the audit report has optional `Product Fit and Genericity` and `Cross-Screen Consistency` sections. ([#39](https://github.com/leonextlevel/open-prototypen-cli/issues/39))
 - The design skill has an interaction-patterns reference for choosing navigation, action hierarchy, overlays, destructive-action safeguards, and collection representations, mapped to the prototype runtime. ([#40](https://github.com/leonextlevel/open-prototypen-cli/issues/40))
+- The design skill has a forms-and-feedback reference covering labels, controls, errors that keep valid input, feedback scope, and empty states by reason, and the product-flows template asks for each kind of empty state. ([#41](https://github.com/leonextlevel/open-prototypen-cli/issues/41))
 
 ### Changed
 

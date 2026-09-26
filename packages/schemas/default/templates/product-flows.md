@@ -19,7 +19,7 @@ TODO: Replace with researched or reasoned content.
 
 ## Error and Empty States
 
-TODO: Replace with researched or reasoned content.
+TODO: List each error and how the user recovers, and each empty state by its reason: first use, no data yet, filtered to zero, search with no results, missing permission, failed load, or deleted content, with what the user can do in each.
 
 ## Open Questions
 

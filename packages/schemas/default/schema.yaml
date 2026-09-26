@@ -58,7 +58,7 @@ artifacts:
     requires: [product-definition]
     requiredSections:
       [Actors, Core Flows, Error and Empty States, Open Questions]
-    instructions: Describe key paths, entry points, decisions, success, and failure states.
+    instructions: Describe key paths, entry points, decisions, success, and failure states. Distinguish empty states by their reason, such as first use, filtered to zero, missing permission, or failed load.
   - id: screen-map
     output: product/screens.md
     requires: [product-definition, product-flows]
