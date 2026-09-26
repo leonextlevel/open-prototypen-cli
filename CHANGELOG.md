@@ -19,6 +19,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `validate canvas` warns `component-undeclared` about component masters whose name is not a `<name>/<state>` declared in `system.yaml`. ([#20](https://github.com/leonextlevel/open-prototypen-cli/issues/20))
 - `status` reports per-artifact `warnings` and warns `audit-stale` when the audit report is older than the `.fig`, `system.yaml`, or `interactions.yaml`, so refine loops end with a fresh check. ([#21](https://github.com/leonextlevel/open-prototypen-cli/issues/21))
 - `svg import --variants 16:color/icon/muted,24:color/accent` creates one icon master per size and color, named like `icon/check/16-muted`, rescaled and with its vector paints bound to the COLOR token. ([#22](https://github.com/leonextlevel/open-prototypen-cli/issues/22))
+- `open-prototypen eval <script.js> [--write]` runs a script on the project `.fig` with helpers available as `op` (`token`, `bind`, `master`, `page`, `byRef`, `setRef`, `freeSpot`, `place`) that resolve nodes by name or reference instead of IDs that change on save. ([#23](https://github.com/leonextlevel/open-prototypen-cli/issues/23))
 
 ### Changed
 
