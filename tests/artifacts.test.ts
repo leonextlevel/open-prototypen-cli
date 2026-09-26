@@ -168,6 +168,40 @@ ${[
     );
   });
 
+  it('keeps research written for the previous templates valid', () => {
+    const root = project();
+    for (const [id, headings] of [
+      [
+        'ux-research',
+        ['Interaction Patterns', 'Evidence', 'Implications', 'Open Questions'],
+      ],
+      ['visual-research', ['References', 'Principles', 'Avoid', 'Evidence']],
+    ] as const) {
+      const path = artifactPath(root, id);
+      mkdirSync(join(path, '..'), { recursive: true });
+      writeFileSync(
+        path,
+        templateFor(id).replace(
+          /\n## [\s\S]*$/,
+          '\n' +
+            headings
+              .map((heading) => `## ${heading}\n\nPesquisa em prosa.\n`)
+              .join('\n'),
+        ),
+      );
+      expect(validateArtifact(root, id, false).findings).toEqual([]);
+      put(root, id, false);
+      expect(
+        validateArtifact(root, id, false).findings.map(
+          (finding) => finding.code,
+        ),
+      ).toContain('section-empty');
+      put(root, id);
+      expect(validateArtifact(root, id, false).findings).toEqual([]);
+    }
+    expect(templateFor('visual-research')).toContain('**Do not copy**');
+  });
+
   it('accepts audit reports with and without the optional tables', () => {
     const root = project();
     const path = artifactPath(root, 'audit-report');
