@@ -1,4 +1,10 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  utimesSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -84,6 +90,38 @@ describe('artifact workflow', () => {
     put(root, 'screen-map');
     expect(validateArtifact(root, 'screen-map', false).findings).toEqual([]);
     expect(templateFor('product-definition')).toMatch(/stable ID/);
+  });
+
+  it('flags an audit report older than the files it describes', () => {
+    const root = project();
+    put(root, 'audit-report');
+    const report = artifactPath(root, 'audit-report');
+    const system = join(root, 'docs/design/design/system.yaml');
+    const figure = join(root, 'docs/design/prototype/prototype.fig');
+    mkdirSync(join(figure, '..'), { recursive: true });
+    mkdirSync(join(system, '..'), { recursive: true });
+    writeFileSync(system, 'version: 1\n');
+    writeFileSync(figure, '');
+    const audit = () =>
+      status(root).find((item) => item.artifact === 'audit-report')?.warnings ??
+      [];
+    const at = (path: string, seconds: number) =>
+      utimesSync(path, seconds, seconds);
+    at(system, 1000);
+    at(figure, 1000);
+    at(report, 2000);
+    expect(audit()).toEqual([]);
+    at(figure, 3000);
+    expect(audit()).toEqual([
+      {
+        code: 'audit-stale',
+        message:
+          'The audit report is older than prototype/prototype.fig; re-check the changed prototype and update the report',
+      },
+    ]);
+    expect(
+      status(root).find((item) => item.artifact === 'brief')?.warnings,
+    ).toEqual([]);
   });
 
   it('accepts audit reports with and without the optional tables', () => {

@@ -17,6 +17,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `svg import` accepts `--page`, `--x`, `--y`, and `--component`: imports land on the chosen page, to the right of its content unless coordinates are given, so repeated imports no longer stack, and `--json` reports the page and position. ([#17](https://github.com/leonextlevel/open-prototypen-cli/issues/17))
 - `unreachable-screen` follows `when`, `set-state`, and scenarios, so a screen reachable only through an action whose condition can never hold is reported, and `unsatisfiable-when` warns about a `when` value that nothing sets. ([#18](https://github.com/leonextlevel/open-prototypen-cli/issues/18))
 - `validate canvas` warns `component-undeclared` about component masters whose name is not a `<name>/<state>` declared in `system.yaml`. ([#20](https://github.com/leonextlevel/open-prototypen-cli/issues/20))
+- `status` reports per-artifact `warnings` and warns `audit-stale` when the audit report is older than the `.fig`, `system.yaml`, or `interactions.yaml`, so refine loops end with a fresh check. ([#21](https://github.com/leonextlevel/open-prototypen-cli/issues/21))
 
 ### Changed
 
