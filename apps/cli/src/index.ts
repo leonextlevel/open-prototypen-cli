@@ -27,7 +27,9 @@ import {
 } from '../../../packages/openpencil/src/refs.js';
 import {
   compilePrototype,
+  DESIGN_SYSTEM_PAGE,
   inspectScreen,
+  renderPages,
   renderScreens,
   validatePrototypeCanvas,
 } from '../../../packages/prototype/src/index.js';
@@ -261,10 +263,45 @@ ref
   });
 program
   .command('render [screen]')
-  .description('Export OpenPencil frames to PNG')
+  .description(
+    'Export OpenPencil screen frames, or whole pages with --page, to PNG',
+  )
+  .option(
+    '--page <name>',
+    'Export a page to renders/pages/<slug>.png (repeatable)',
+    (value: string, previous: string[]) => [...previous, value],
+    [] as string[],
+  )
+  .option('--system', `Export the ${DESIGN_SYSTEM_PAGE} page`)
+  .option(
+    '--background <hex>',
+    'Opaque page background (default: canvas token, else page background)',
+  )
   .option('--json', 'Machine-readable JSON')
-  .action((screen: string | undefined, options: { json?: boolean }) =>
-    output(renderScreens(root(), screen), options.json),
+  .action(
+    (
+      screen: string | undefined,
+      options: {
+        page: string[];
+        system?: boolean;
+        background?: string;
+        json?: boolean;
+      },
+    ) => {
+      const pages = [
+        ...options.page,
+        ...(options.system ? [DESIGN_SYSTEM_PAGE] : []),
+      ];
+      if (!pages.length)
+        return output(renderScreens(root(), screen), options.json);
+      output(
+        {
+          screens: screen ? renderScreens(root(), screen) : [],
+          pages: renderPages(root(), [...new Set(pages)], options.background),
+        },
+        options.json,
+      );
+    },
   );
 program
   .command('prototype')
