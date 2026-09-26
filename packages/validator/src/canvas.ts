@@ -138,6 +138,22 @@ function masterLabelWarnings(
     }));
 }
 
+function insideMaster(
+  node: NativeNode,
+  nodes: Map<string, NativeNode>,
+): boolean {
+  const seen = new Set<string>();
+  for (
+    let id = node.parentId;
+    id && !seen.has(id);
+    id = nodes.get(id)?.parentId ?? null
+  ) {
+    if (nodes.get(id)?.type === 'COMPONENT') return true;
+    seen.add(id);
+  }
+  return false;
+}
+
 function insideComponent(
   node: NativeNode,
   nodes: Map<string, NativeNode>,
@@ -329,6 +345,20 @@ export function validateCanvas(
   summary.boundTokens = variables.filter((variable) =>
     boundIds.has(variable.id),
   ).length;
+  const sampleWarnings: CanvasFinding[] = [];
+  const nodes = new Map(native.nodes.map((node) => [node.id, node]));
+  // Instances inherit their master's bindings, so a binding inside a master counts as applied.
+  const sampleOnly = (variableId: string, all: NativeNode[]) =>
+    all
+      .filter((node) =>
+        Object.values(node.boundVariables ?? {}).includes(variableId),
+      )
+      .every(
+        (node) =>
+          pageOf(node, nodes)?.name === DESIGN_SYSTEM_PAGE &&
+          node.type !== 'COMPONENT' &&
+          !insideMaster(node, nodes),
+      );
   for (const token of system.tokens) {
     const matches = variables.filter((item) => item.name === token.name);
     if (matches.length !== 1) {
@@ -353,6 +383,11 @@ export function validateCanvas(
         code: 'token-unbound',
         message: `Native variable is not bound to a node: ${token.name}`,
       });
+    else if (sampleOnly(variable.id, native.nodes))
+      sampleWarnings.push({
+        code: 'token-sample-only',
+        message: `Native variable ${token.name} is bound only to samples on ${DESIGN_SYSTEM_PAGE}; bind it in component masters or screens too`,
+      });
   }
   const declared = new Set(system.tokens.map((token) => token.name));
   const undeclared = variables
@@ -361,7 +396,6 @@ export function validateCanvas(
       code: 'token-undeclared',
       message: `Native variable ${variable.name} is not in system.yaml; declare it or run open-prototypen system apply --prune`,
     }));
-  const nodes = new Map(native.nodes.map((node) => [node.id, node]));
   const components = native.nodes.filter((node) => node.type === 'COMPONENT');
   const instances = native.nodes.filter((node) => node.type === 'INSTANCE');
   summary.components = components.length;
@@ -426,6 +460,7 @@ export function validateCanvas(
     valid: findings.length === 0,
     findings,
     warnings: [
+      ...sampleWarnings,
       ...undeclared,
       ...masterPageWarnings(components, nodes),
       ...masterLabelWarnings(components, nodes),
