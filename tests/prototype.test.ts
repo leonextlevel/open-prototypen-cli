@@ -512,3 +512,180 @@ screens:
   },
   30000,
 );
+
+it.skipIf(!existsSync('/usr/bin/google-chrome'))(
+  'simulates scenarios from a panel outside the screens',
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'open-prototypen-scenarios-'));
+    projects.push(root);
+    initProject(root, 'codex');
+    writeFileSync(
+      join(root, 'docs/design/config.yaml'),
+      'version: 1\nschema: default\nlanguage:\n  mode: auto\n  fallback: en\ndesignEngine: openpencil\n',
+    );
+    mkdirSync(join(root, 'docs/design/design'), { recursive: true });
+    writeFileSync(
+      join(root, 'docs/design/design/system.yaml'),
+      "version: 1\ntokens:\n  - name: color.surface\n    type: COLOR\n    value: '#112233'\ncomponents:\n  - name: Probe\n    states: [default]\n",
+    );
+    await applyDesignSystem(root);
+    evalDocument(
+      root,
+      `
+      const form = figma.createFrame(); form.name = 'form'; form.resize(200, 160);
+      for (const [name, x] of [['submit', 20], ['open', 100]]) {
+        const node = figma.createRectangle(); node.name = name; node.resize(60, 30);
+        form.appendChild(node); node.x = x; node.y = 20;
+      }
+      const sheet = figma.createFrame(); sheet.name = 'sheet'; sheet.resize(200, 80); sheet.x = 300;
+      const done = figma.createFrame(); done.name = 'done'; done.resize(200, 160); done.x = 600;
+      const error = figma.createFrame(); error.name = 'error'; error.resize(200, 160); error.x = 900;
+    `,
+      true,
+    );
+    const tree = inspectCanvas(root).tree;
+    const id = (name: string) => {
+      const visit = (nodes: typeof tree): string | undefined =>
+        nodes
+          .map((node) =>
+            node.name === name ? node.id : visit(node.children ?? []),
+          )
+          .find(Boolean);
+      return visit(tree) ?? '';
+    };
+    setRefs(
+      root,
+      ['form', 'submit', 'open', 'sheet', 'done', 'error'].map((ref) => ({
+        id: id(ref),
+        ref,
+      })),
+    );
+    const interactions = (scenarios: string) => `version: 1
+initialScreen: form
+scenarios:
+${scenarios}
+screens:
+  form:
+    frame: form
+    title: Form
+    content: Form screen.
+    actions:
+      submit:
+        node: submit
+        label: Submit
+        action: navigate
+        target: done
+      submit-error:
+        node: submit
+        label: Submit
+        when: { key: outcome, value: error }
+        action: navigate
+        target: error
+      submit-timeout:
+        node: submit
+        label: Submit
+        when: { key: outcome, value: timeout }
+        action: navigate
+        target: error
+      open:
+        node: open
+        label: Open sheet
+        action: open-overlay
+        target: sheet
+  sheet:
+    frame: sheet
+    title: Sheet
+    content: Sheet content.
+  done:
+    frame: done
+    title: Done
+    content: Done screen.
+  error:
+    frame: error
+    title: Error
+    content: Error screen.
+`;
+    const outcome = `  - key: outcome
+    label: Server response
+    initial: error
+    values:
+      - { value: ok, label: Success }
+      - { value: error, label: Server error }`;
+    const write = (scenarios: string) =>
+      writeFileSync(
+        join(root, 'docs/design/prototype/interactions.yaml'),
+        interactions(scenarios),
+      );
+    write(`${outcome}\n${outcome}`);
+    expect(() => compilePrototype(root)).toThrow(
+      'Duplicate scenario key: outcome',
+    );
+    write(outcome.replace('initial: error', 'initial: maybe'));
+    expect(() => compilePrototype(root)).toThrow(
+      'Initial value maybe of scenario outcome is not one of its values: ok, error',
+    );
+    write(
+      `${outcome}\n  - key: theme\n    label: Theme\n    initial: light\n    values:\n      - { value: light, label: Light }\n      - { value: dark, label: Dark }`,
+    );
+    renderScreens(root);
+    const result = compilePrototype(root);
+    expect(
+      result.warnings
+        .filter((warning) => warning.code.includes('scenario'))
+        .map((warning) => warning.code),
+    ).toEqual(['unknown-scenario-value', 'unused-scenario']);
+    const manifest = JSON.parse(
+      readFileSync(join(result.output, 'manifest.json'), 'utf8'),
+    );
+    expect(
+      manifest.scenarios.map((entry: { key: string }) => entry.key),
+    ).toEqual(['outcome', 'theme']);
+    const browser = await chromium.launch({
+      executablePath: '/usr/bin/google-chrome',
+      headless: true,
+      args: ['--no-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.goto(pathToFileURL(join(result.output, 'index.html')).href);
+      const screen = () => page.locator('body').getAttribute('data-screen');
+      const response = page.getByLabel('Server response');
+      // The initial value gates the default action from the first visit.
+      expect(await response.inputValue()).toBe('error');
+      await page.getByRole('button', { name: 'Submit' }).click();
+      await expect.poll(screen).toBe('error');
+      await page.getByRole('button', { name: 'Reset' }).click();
+      await expect.poll(screen).toBe('form');
+      await response.focus();
+      await response.selectOption('ok');
+      expect(await page.evaluate(() => document.activeElement?.tagName)).toBe(
+        'SELECT',
+      );
+      await page.getByRole('button', { name: 'Submit' }).click();
+      await expect.poll(screen).toBe('done');
+      // Reset restores initial values and clears history.
+      await page.getByRole('button', { name: 'Reset' }).click();
+      await expect.poll(screen).toBe('form');
+      expect(await response.inputValue()).toBe('error');
+      // Overlays leave the panel usable.
+      await page.getByRole('button', { name: 'Open sheet' }).click();
+      await expect
+        .poll(() => page.locator('body').getAttribute('data-overlay'))
+        .toBe('sheet');
+      expect(
+        await page.evaluate(() =>
+          document.querySelector('.scenarios')?.closest('[inert]'),
+        ),
+      ).toBeNull();
+      await response.selectOption('ok');
+      expect(await page.getByRole('dialog', { name: 'Sheet' }).count()).toBe(1);
+      await page.getByRole('button', { name: 'Reset' }).click();
+      await expect
+        .poll(() => page.locator('body').getAttribute('data-overlay'))
+        .toBe('');
+    } finally {
+      await browser.close();
+    }
+  },
+  60000,
+);

@@ -8,11 +8,51 @@
       body {
         margin: 0;
         min-height: 100vh;
-        display: grid;
-        place-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        gap: 24px;
         background: #202124;
         color: white;
         font: 16px system-ui;
+        --reserved: 0px;
+      }
+      body.has-scenarios {
+        --reserved: calc(14rem + 24px);
+      }
+      .scenarios {
+        position: relative;
+        z-index: 1;
+        box-sizing: border-box;
+        width: 14rem;
+        padding: 16px;
+        border-radius: 8px;
+        background: #303134;
+        font-size: 14px;
+      }
+      .scenarios h2 {
+        margin: 0 0 12px;
+        font-size: 14px;
+      }
+      .scenarios label {
+        display: block;
+        margin-bottom: 12px;
+      }
+      .scenarios select,
+      .scenarios button {
+        display: block;
+        width: 100%;
+        margin-top: 4px;
+        font: inherit;
+      }
+      .scenarios :focus-visible {
+        outline: 3px solid #8ab4f8;
+      }
+      @media (max-width: 640px) {
+        body.has-scenarios {
+          --reserved: 0px;
+        }
       }
       .stage {
         position: relative;
@@ -69,6 +109,7 @@
       );
       const app = document.getElementById('app');
       const history = [];
+      const scenarios = data.scenarios || [];
       const state = {};
       let current = data.initialScreen;
       let overlay = null;
@@ -81,7 +122,7 @@
         const root = document.createElement('div');
         root.className = 'stage';
         root.style.width =
-          'min(100vw, calc(100vh * ' +
+          'min(calc(100vw - var(--reserved)), calc(100vh * ' +
           config.width / config.height +
           '), ' +
           config.width +
@@ -165,6 +206,55 @@
         draw(focus);
       }
 
+      // The scenario panel lies outside the screens, so overlays never make it inert
+      // and redraws keep focus on it.
+      function scenarioPanel() {
+        const panel = document.createElement('aside');
+        panel.className = 'scenarios';
+        panel.setAttribute('aria-labelledby', 'scenarios-title');
+        const heading = document.createElement('h2');
+        heading.id = 'scenarios-title';
+        heading.lang = 'en';
+        heading.textContent = 'Scenarios';
+        panel.append(heading);
+        for (const scenario of scenarios) {
+          const label = document.createElement('label');
+          label.textContent = scenario.label;
+          const select = document.createElement('select');
+          select.dataset.scenario = scenario.key;
+          for (const option of scenario.values)
+            select.append(new Option(option.label, option.value));
+          select.addEventListener('change', () => {
+            state[scenario.key] = select.value;
+            draw('none');
+          });
+          label.append(select);
+          panel.append(label);
+        }
+        const reset = document.createElement('button');
+        reset.type = 'button';
+        reset.lang = 'en';
+        reset.textContent = 'Reset';
+        reset.addEventListener('click', () => {
+          restart();
+          draw('screen');
+        });
+        panel.append(reset);
+        return panel;
+      }
+
+      // Restores initial scenario values, clears history, and returns to the initial screen.
+      function restart() {
+        for (const key of Object.keys(state)) delete state[key];
+        for (const scenario of scenarios)
+          state[scenario.key] = scenario.initial;
+        history.length = 0;
+        current = data.initialScreen;
+        overlay = null;
+        for (const select of document.querySelectorAll('[data-scenario]'))
+          select.value = state[select.dataset.scenario];
+      }
+
       function closeOverlay() {
         overlay = null;
         draw({ slot: opener });
@@ -176,48 +266,61 @@
         (target || layer.querySelector('h1')).focus();
       }
 
+      // `focus` is 'none' when a scenario control changed, so focus stays in the panel.
       function draw(focus) {
         const base = stage(current);
         app.replaceChildren(base);
-        if (overlay) {
-          // The overlay is modal: the screen below leaves the tab order and accessibility tree.
-          base.inert = true;
-          const backdrop = document.createElement('div');
-          backdrop.className = 'overlay-backdrop';
-          backdrop.addEventListener('click', (event) => {
-            if (event.target === backdrop) closeOverlay();
-          });
-          const dialog = stage(overlay);
-          dialog.setAttribute('role', 'dialog');
-          dialog.setAttribute('aria-modal', 'true');
-          dialog.setAttribute('aria-label', data.screens[overlay].title);
-          dialog.tabIndex = -1;
-          backdrop.append(dialog);
-          app.append(backdrop);
-          if (placement === 'bottom') {
-            // Anchor to the bottom edge of the screen below, at that screen's scale.
-            const box = base.getBoundingClientRect();
-            const scale = box.width / data.screens[current].width;
-            const width = data.screens[overlay].width * scale;
-            dialog.style.position = 'fixed';
-            dialog.style.width = width + 'px';
-            dialog.style.left = box.left + (box.width - width) / 2 + 'px';
-            dialog.style.top =
-              box.bottom - data.screens[overlay].height * scale + 'px';
-          }
-          if (focus && focus.slot) focusSlot(dialog, focus.slot);
-          else dialog.focus();
-        } else if (focus) focusSlot(base, focus.slot);
         document.body.dataset.screen = current;
         document.body.dataset.overlay = overlay || '';
+        if (!overlay) {
+          if (focus && focus !== 'none') focusSlot(base, focus.slot);
+          return;
+        }
+        // The overlay is modal: the screen below leaves the tab order and accessibility tree.
+        base.inert = true;
+        const backdrop = document.createElement('div');
+        backdrop.className = 'overlay-backdrop';
+        backdrop.addEventListener('click', (event) => {
+          if (event.target === backdrop) closeOverlay();
+        });
+        const dialog = stage(overlay);
+        dialog.setAttribute('role', 'dialog');
+        dialog.setAttribute('aria-modal', 'true');
+        dialog.setAttribute('aria-label', data.screens[overlay].title);
+        dialog.tabIndex = -1;
+        backdrop.append(dialog);
+        app.append(backdrop);
+        if (placement === 'bottom') {
+          // Anchor to the bottom edge of the screen below, at that screen's scale.
+          const box = base.getBoundingClientRect();
+          const scale = box.width / data.screens[current].width;
+          const width = data.screens[overlay].width * scale;
+          dialog.style.position = 'fixed';
+          dialog.style.width = width + 'px';
+          dialog.style.left = box.left + (box.width - width) / 2 + 'px';
+          dialog.style.top =
+            box.bottom - data.screens[overlay].height * scale + 'px';
+        }
+        if (focus === 'none') return;
+        if (focus && focus.slot) focusSlot(dialog, focus.slot);
+        else dialog.focus();
       }
       window.addEventListener('resize', () => {
         if (overlay && placement === 'bottom')
-          draw({ slot: document.activeElement.dataset.slot });
+          draw(
+            document.activeElement.closest('.scenarios')
+              ? 'none'
+              : { slot: document.activeElement.dataset.slot },
+          );
       });
       document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && overlay) closeOverlay();
       });
+      if (scenarios.length) {
+        document.body.classList.add('has-scenarios');
+        document.body.prepend(scenarioPanel());
+      }
+      restart();
       draw();
     </script>
   </body>
