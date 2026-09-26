@@ -52,23 +52,42 @@ screens:
 
 Replace the example references with the references assigned in the `.fig`; an action can add `part: <layer name>` when `node` is an instance. Give every screen a title and a textual account of its meaningful visible content; give every action a label in the user's language. These fields are required because PNG text is inaccessible to screen readers. Other actions are `open-overlay`, which shows the target screen as a modal centered over the dimmed current screen, or anchored to its bottom edge with `placement: bottom` for bottom sheets, and `close-overlay`; `set-state` takes `key`, `value`, and an optional target screen; `external-link` takes an HTTP(S) `url`. An optional `when: {key, value}` makes an action active only for that state.
 
-Simulate outcomes the prototype cannot compute, such as a server conflict or an expired deadline, with runtime state. State starts empty and lasts for the visit, so a `when` action is inactive until a `set-state` action sets its key. When active actions share a node, only the one declared last gets a hotspot, for pointer, keyboard, and screen reader users alike. Declare the default action first and the state-specific action after it on the same node; a `covered-action` warning means an earlier action can never be clicked. For example, the first confirmation attempt shows a conflict and a retry succeeds:
+Simulate outcomes the prototype cannot compute, such as a server error or a resource conflict, with runtime state. State starts empty and lasts for the visit, so a `when` action is inactive until a `set-state` action sets its key. When active actions share a node, only the one declared last gets a hotspot, for pointer, keyboard, and screen reader users alike. Declare the default action first and the state-specific override after it on the same node; a `covered-action` warning means an earlier action can never be clicked.
 
-```yaml
-actions:
-  confirm:
-    node: confirm-button
-    label: 'Confirmar reserva'
-    action: set-state
-    key: attempt
-    value: retried
-    target: confirm-conflict
-  confirm-retry:
-    node: confirm-button
-    label: 'Confirmar reserva'
-    when: { key: attempt, value: retried }
-    action: navigate
-    target: success
-```
+The exit from an error state leads to a screen that reflects the error and lets the user complete the task by another path. Choose the pattern by whether retrying can succeed:
 
-To let a reviewer choose a scenario instead, add a visible, clearly labeled control (for example "Protótipo: simular 13:45") that sets the state, and gate the affected actions with `when`.
+- **Transient failure**, where retrying may succeed, such as a checkout flow where the server rejects the order. The first attempt records the failure and shows the error screen; its retry action completes the order.
+
+  ```yaml
+  actions:
+    submit:
+      node: submit-button
+      label: '<Submit label in the user language>'
+      action: set-state
+      key: order
+      value: rejected
+      target: order-error
+  ```
+
+  `order-error` shows the rejection and gives a retry action that navigates to `confirmation`.
+
+- **Resource conflict**, where retrying the same request cannot succeed, such as a booking form where the slot was just taken. Never let a retry book the lost resource. Let a visible, clearly labeled scenario control (for example "<Prototype: simulate taken slot>") set the state, and override the default action while it is set:
+
+  ```yaml
+  actions:
+    submit:
+      node: submit-button
+      label: '<Submit label in the user language>'
+      action: navigate
+      target: confirmation
+    submit-conflict:
+      node: submit-button
+      label: '<Submit label in the user language>'
+      when: { key: slot, value: taken }
+      action: navigate
+      target: slot-taken
+  ```
+
+  `slot-taken` shows the lost slot as unavailable and lets the user choose another one and finish the booking.
+
+Replace the placeholders with labels in the user's language.

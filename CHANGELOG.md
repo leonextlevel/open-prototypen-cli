@@ -9,6 +9,10 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `validate canvas` warns `master-label` about text on the `Design System` page that repeats a component master's name, and the design and component review skills keep text there to group headings and token sample labels. ([#29](https://github.com/leonextlevel/open-prototypen-cli/issues/29))
 - `system apply` gives every page a neutral gray background slightly apart from all token colors, or the `pageBackground` declared in `system.yaml`, so screen frame edges stay visible; `validate canvas` warns `page-background` about pages that differ. ([#30](https://github.com/leonextlevel/open-prototypen-cli/issues/30))
 
+### Changed
+
+- The design skill shows how to simulate a transient failure, where a retry succeeds, and a resource conflict, whose recovery screen keeps the lost resource unavailable, with placeholder labels; the skill and `docs/interactions.md` give the same guidance on actions that share a node. ([#5](https://github.com/leonextlevel/open-prototypen-cli/issues/5))
+
 ### Fixed
 
 - When several active actions share a node, the prototype renders a single hotspot for the one declared last, so keyboard and screen reader users reach the same action as pointer users. ([#3](https://github.com/leonextlevel/open-prototypen-cli/issues/3))
