@@ -269,6 +269,10 @@ it('requires manifest components, bound tokens, and linked screen instances befo
   });
   expect(validation.warnings).toEqual([
     expect.objectContaining({ code: 'design-system-page' }),
+    expect.objectContaining({
+      code: 'component-unused',
+      message: 'Component master BookRow/selected has no linked instance',
+    }),
   ]);
   writeFileSync(
     join(root, 'docs/design/prototype/interactions.yaml'),
@@ -328,6 +332,49 @@ it('counts components nested inside other component instances as screen usage', 
     valid: true,
     findings: [],
   });
+}, 60000);
+
+it('warns about instances on undeclared screens and unused masters', async () => {
+  const root = fixture();
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'components:',
+      'components:\n  - name: Badge\n    states: [active]\n  - name: Card\n    states: [default]',
+    ),
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const badge = figma.createComponent(); badge.name = 'Badge/active'; badge.resize(40, 20);
+    const row = figma.createComponent(); row.name = 'BookRow/default'; row.resize(300, 80);
+    row.appendChild(badge.createInstance());
+    const selected = figma.createComponent(); selected.name = 'BookRow/selected'; selected.resize(300, 80);
+    const card = figma.createComponent(); card.name = 'Card/default'; card.resize(300, 80);
+    const collection = figma.createFrame(); collection.name = 'collection'; collection.resize(390, 760);
+    collection.appendChild(row.createInstance());
+    const settings = figma.createFrame(); settings.name = 'settings'; settings.resize(390, 760);
+    settings.appendChild(row.createInstance());
+    settings.appendChild(selected.createInstance());
+  `,
+    true,
+  );
+  const tree = inspectCanvas(root).tree;
+  const frame = (name: string) =>
+    tree.find((node) => node.name === name)?.id ?? '';
+  const warnings = validateCanvas(root, {
+    collection: frame('collection'),
+    settings: frame('settings'),
+  }).warnings.filter((warning) => warning.code.startsWith('component-'));
+  // BookRow is used directly on settings; Badge only through the nested instance in BookRow.
+  // Badge/active is used only inside another master, which counts as use.
+  expect(warnings.map((warning) => warning.message)).toEqual([
+    'Component Badge appears on screen collection, which its screens in system.yaml do not list',
+    'Component BookRow appears on screen settings, which its screens in system.yaml do not list',
+    'Component Badge appears on screen settings, which its screens in system.yaml do not list',
+    'Component master Card/default has no linked instance',
+  ]);
 }, 60000);
 
 it('warns about text that repeats a master name on the Design System page', async () => {
@@ -520,17 +567,18 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
   );
   // Pages created after the first system apply keep OpenPencil's default background.
   expect(
-    validateCanvas(root, { collection: ids.collection }).warnings.map(
-      (warning) => warning.code,
-    ),
+    validateCanvas(root, { collection: ids.collection })
+      .warnings.map((warning) => warning.code)
+      .filter((code) => code === 'page-background'),
   ).toEqual(['page-background', 'page-background', 'page-background']);
   expect(await applyDesignSystem(root)).toMatchObject({
     pageBackground: '#323232',
     pages: ['Flow: Detail', 'Shared', 'Design System'],
   });
+  // The fixture shows only the default state; the selected master stays unused.
   expect(validateCanvas(root, { collection: ids.collection })).toMatchObject({
     valid: true,
-    warnings: [],
+    warnings: [expect.objectContaining({ code: 'component-unused' })],
   });
   const native = inspectNativeSystem(root);
   expect(native.pages.map((page) => page.background)).toEqual([
