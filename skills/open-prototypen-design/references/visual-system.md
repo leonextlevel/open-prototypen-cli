@@ -35,6 +35,8 @@ components:
     screens: [collection]
 ```
 
+`system apply` paints every page with a neutral gray close to the palette's page color but at least visibly apart from each opaque token color, so screen frames stand out. Set `pageBackground: '#RRGGBB'` at the top level to choose it yourself; the value must be a neutral gray that is not too close to any token color.
+
 The native components for this example are `BookRow/default` and `BookRow/selected`. Add only components and states actually used by the product. After editing the contract, run `open-prototypen system apply` to create the `.fig` if necessary and synchronize variables. Create a `Design System` page with all native component masters and their states, grouped under short headings and without text that repeats a master's name, plus visible color, typography, and spacing samples labeled by role and value. Bind token variables to meaningful properties in the masters and samples where supported, and use linked instances in the declared screens. `system apply` synchronizes variables; it does not compose the reference page, components, or screens.
 
 ## Component inventory and states

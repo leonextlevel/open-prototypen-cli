@@ -9,7 +9,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { systemPath } from '../packages/core/src/system.js';
+import {
+  pageBackground,
+  readDesignSystem,
+  systemPath,
+} from '../packages/core/src/system.js';
 import { initProject, installSkills } from '../packages/harness/src/index.js';
 import {
   evalDocument,
@@ -268,6 +272,40 @@ it('warns about text that repeats a master name on the Design System page', asyn
   ]);
 }, 60000);
 
+it('chooses a neutral page background slightly apart from every token color', () => {
+  const root = fixture();
+  const system = (colors: string[], extra = '') => {
+    writeFileSync(
+      systemPath(root),
+      `version: 1\ntokens:\n${colors
+        .map(
+          (value, index) =>
+            `  - name: color.c${index}\n    type: COLOR\n    value: '${value}'\n`,
+        )
+        .join(
+          '',
+        )}  - name: color.scrim\n    type: COLOR\n    value: '#FFFFFF80'\ncomponents:\n  - name: Row\n    states: [default]\n${extra}`,
+    );
+    return () => readDesignSystem(root);
+  };
+  // Light palettes get a light gray and dark palettes a dark one; translucent colors are ignored.
+  expect(
+    pageBackground(system(['#FFFFFF', '#F5F5F7', '#111111', '#1769FF'])()),
+  ).toBe('#DADADA');
+  expect(
+    pageBackground(system(['#0B0B0F', '#16161C', '#F2F2F2', '#FF5A36'])()),
+  ).toBe('#2A2A2A');
+  expect(
+    pageBackground(system(['#FFFFFF'], "pageBackground: '#b0b0b0'\n")()),
+  ).toBe('#B0B0B0');
+  expect(system(['#FFFFFF'], "pageBackground: '#FAFAFA'\n")).toThrow(
+    'too close to a token color',
+  );
+  expect(system(['#FFFFFF'], "pageBackground: '#C0D0F0'\n")).toThrow(
+    'not a neutral gray',
+  );
+});
+
 it('inspects, renders, and compiles screens across flow pages', async () => {
   const root = fixture();
   await applyDesignSystem(root);
@@ -345,11 +383,27 @@ it('inspects, renders, and compiles screens across flow pages', async () => {
   expect(relativeBounds(canvas.tree, ids.collection, ids.action)).toMatchObject(
     { x: 30, y: 90 },
   );
+  // Pages created after the first system apply keep OpenPencil's default background.
+  expect(
+    validateCanvas(root, { collection: ids.collection }).warnings.map(
+      (warning) => warning.code,
+    ),
+  ).toEqual(['page-background', 'page-background', 'page-background']);
+  expect(await applyDesignSystem(root)).toMatchObject({
+    pageBackground: '#323232',
+    pages: ['Flow: Detail', 'Shared', 'Design System'],
+  });
   expect(validateCanvas(root, { collection: ids.collection })).toMatchObject({
     valid: true,
     warnings: [],
   });
   const native = inspectNativeSystem(root);
+  expect(native.pages.map((page) => page.background)).toEqual([
+    '#323232',
+    '#323232',
+    '#323232',
+    '#323232',
+  ]);
   const component = native.nodes.find(
     (node) => node.type === 'COMPONENT' && node.name === 'BookRow/default',
   );

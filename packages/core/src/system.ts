@@ -37,8 +37,24 @@ const systemSchema = z
     version: z.literal(1),
     tokens: z.array(tokenSchema).min(1),
     components: z.array(componentSchema).min(1),
+    pageBackground: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .optional(),
   })
   .superRefine((system, context) => {
+    if (system.pageBackground) {
+      const problem = pageBackgroundProblem(
+        system.pageBackground,
+        system.tokens,
+      );
+      if (problem)
+        context.addIssue({
+          code: 'custom',
+          message: problem,
+          path: ['pageBackground'],
+        });
+    }
     const tokenNames = new Set<string>();
     for (const [index, token] of system.tokens.entries()) {
       if (tokenNames.has(token.name))
@@ -114,4 +130,115 @@ export function sameTokenValue(actual: unknown, expected: unknown): boolean {
     );
   }
   return actual === expected;
+}
+
+// Page backgrounds are neutral grays kept visibly apart from every opaque token color, so frame
+// edges stay readable in the editor. Distances are Euclidean in OKLab, where 0.02 is barely visible.
+export const PAGE_BACKGROUND_MIN_DISTANCE = 0.08;
+const PAGE_BACKGROUND_MAX_CHROMA = 0.02;
+const DEFAULT_PAGE_BACKGROUND = '#D4D4D4';
+type Rgb = { r: number; g: number; b: number };
+
+export function hexColor(color: Rgb): string {
+  return (
+    '#' +
+    [color.r, color.g, color.b]
+      .map((channel) =>
+        Math.round(Math.min(1, Math.max(0, channel)) * 255)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')
+      .toUpperCase()
+  );
+}
+
+function oklab({ r, g, b }: Rgb): [number, number, number] {
+  const linear = (value: number) =>
+    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  const [lr, lg, lb] = [linear(r), linear(g), linear(b)];
+  const l = Math.cbrt(
+    0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb,
+  );
+  const m = Math.cbrt(
+    0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb,
+  );
+  const s = Math.cbrt(
+    0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb,
+  );
+  return [
+    0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s,
+    1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s,
+    0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s,
+  ];
+}
+
+function opaqueColors(tokens: DesignToken[]): Rgb[] {
+  return tokens.flatMap((token) => {
+    const value = tokenValue(token);
+    return typeof value === 'object' && value.a === 1 ? [value] : [];
+  });
+}
+
+function nearestDistance(color: Rgb, palette: Rgb[]): number {
+  const [l, a, b] = oklab(color);
+  return Math.min(
+    ...palette.map((other) => {
+      const [ol, oa, ob] = oklab(other);
+      return Math.hypot(l - ol, a - oa, b - ob);
+    }),
+  );
+}
+
+function pageBackgroundProblem(
+  hex: string,
+  tokens: DesignToken[],
+): string | undefined {
+  const color = tokenValue({
+    name: 'pageBackground',
+    type: 'COLOR',
+    value: hex,
+  });
+  if (typeof color !== 'object') return undefined;
+  const [, a, b] = oklab(color);
+  if (Math.hypot(a, b) > PAGE_BACKGROUND_MAX_CHROMA)
+    return `Page background ${hex} is not a neutral gray`;
+  const palette = opaqueColors(tokens);
+  if (
+    palette.length &&
+    nearestDistance(color, palette) < PAGE_BACKGROUND_MIN_DISTANCE
+  )
+    return `Page background ${hex} is too close to a token color`;
+  return undefined;
+}
+
+// The declared background, or the gray closest in lightness to the palette's likely page color
+// (its lightest color in a mostly light palette, its darkest otherwise) that still stays
+// PAGE_BACKGROUND_MIN_DISTANCE away from every opaque token color, so the page is only slightly
+// different from screen fills. Without such a gray, the one farthest from the palette wins.
+export function pageBackground(system: DesignSystem): string {
+  if (system.pageBackground) return system.pageBackground.toUpperCase();
+  const palette = opaqueColors(system.tokens);
+  if (!palette.length) return DEFAULT_PAGE_BACKGROUND;
+  const lightness = palette.map((color) => oklab(color)[0]);
+  const light =
+    lightness.reduce((sum, value) => sum + value, 0) / lightness.length >= 0.5;
+  const anchor = light ? Math.max(...lightness) : Math.min(...lightness);
+  // Stay away from pure black and white, which read as frame fills rather than a page.
+  const grays = Array.from({ length: 193 }, (_, index) => {
+    const level = (index + 32) / 255;
+    const color = { r: level, g: level, b: level };
+    return {
+      color,
+      distance: nearestDistance(color, palette),
+      offset: Math.abs(oklab(color)[0] - anchor),
+    };
+  });
+  const clear = grays.filter(
+    (gray) => gray.distance >= PAGE_BACKGROUND_MIN_DISTANCE,
+  );
+  const best = clear.length
+    ? clear.reduce((a, b) => (b.offset < a.offset ? b : a))
+    : grays.reduce((a, b) => (b.distance > a.distance ? b : a));
+  return hexColor(best.color);
 }
