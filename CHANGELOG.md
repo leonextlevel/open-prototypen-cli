@@ -42,6 +42,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The design skill lists focused references with when to read each one: a new intentional-design reference turns product context into design consequences, and the system contract, `Design System` page, components, and icons moved from `visual-system.md` to `design-system.md`. `update` removes installed skill files that are no longer shipped unless they were edited. ([#33](https://github.com/leonextlevel/open-prototypen-cli/issues/33))
 - `render` no longer fetches fonts from the network by default, so renders do not depend on connectivity; pass `--web-fonts` to fetch them. ([#36](https://github.com/leonextlevel/open-prototypen-cli/issues/36))
 - The design-direction template asks for the product context and the consequences of each adjective, and offers optional sections for density and composition, shape and surfaces, navigation and interaction, content voice, design signature, accessibility posture, and motion; the design-decisions template asks for the alternatives considered and the product reason. ([#38](https://github.com/leonextlevel/open-prototypen-cli/issues/38))
+- The UX research template asks for the pattern decisions the product faces and the kind and strength of each source, the visual research template gives each reference an Observed, Why relevant, Principle extracted, and Do not copy block, and the research skill keeps visual inspiration apart from usability evidence. ([#44](https://github.com/leonextlevel/open-prototypen-cli/issues/44))
 
 ### Fixed
 

@@ -47,12 +47,12 @@ artifacts:
     requires: [product-definition]
     requiredSections:
       [Interaction Patterns, Evidence, Implications, Open Questions]
-    instructions: Research interaction patterns in real products and connect observations to this product.
+    instructions: Research the pattern decisions this product faces in real products and research, and connect observations to this product. Name each source's kind and strength, preferring design-system guidance, UX or HCI research, and mature products over visual inspiration, which is not usability evidence.
   - id: visual-research
     output: research/visual.md
     requires: [product-definition]
     requiredSections: [References, Principles, Avoid, Evidence]
-    instructions: Study contextual visual references. Record each source and access date, concrete observations, a product-specific transferable principle, and what should not be copied.
+    instructions: Study contextual visual references. Give each reference a block with its source and access date, what was observed, why it is relevant, the principle extracted, and what not to copy. Synthesize principles across several references, and never copy proprietary composition, distinctive component shapes, or brand identity.
   - id: product-flows
     output: product/flows.md
     requires: [product-definition]
