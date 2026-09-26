@@ -35,6 +35,20 @@ TODO: Compare `design/system.yaml` with native variables, bindings, components, 
 
 TODO: Review text legibility, contrast, focus cues, target size, icon meaning, and the prototype's screen/action descriptions.
 
+## Error Recovery
+
+TODO: Optional. For every error, conflict, and deadline state in the flows, walk the compiled prototype in `prototype/dist` and record whether the user can still complete the task. Report a recovery that cannot be completed as a finding.
+
+| Error | Trigger | Recovery action | Next screen or state | Task can be completed |
+| ----- | ------- | --------------- | -------------------- | --------------------- |
+
 ## Accepted Exceptions
 
 TODO: Record intentional deviations and why they are acceptable, with supporting evidence; do not use this section to hide unresolved critical issues.
+
+## Resolution
+
+TODO: Optional; filled during refine. Record each finding's decision and the evidence that the rebuilt prototype resolves it. A separate context re-checks critical and high findings and fills "Verified by".
+
+| Finding | Decision (fixed / accepted) | Verification evidence | Verified by |
+| ------- | --------------------------- | --------------------- | ----------- |
