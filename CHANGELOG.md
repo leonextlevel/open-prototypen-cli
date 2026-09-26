@@ -29,6 +29,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The design skill has an interaction-patterns reference for choosing navigation, action hierarchy, overlays, destructive-action safeguards, and collection representations, mapped to the prototype runtime. ([#40](https://github.com/leonextlevel/open-prototypen-cli/issues/40))
 - The design skill has a forms-and-feedback reference covering labels, controls, errors that keep valid input, feedback scope, and empty states by reason, and the product-flows template asks for each kind of empty state. ([#41](https://github.com/leonextlevel/open-prototypen-cli/issues/41))
 - The design skill has a content reference on UX writing, consistent terminology, localization-aware layout, and realistic mock data, linked from the main skill and `docs/workflow.md`. ([#42](https://github.com/leonextlevel/open-prototypen-cli/issues/42))
+- The design skill has an accessibility reference with the WCAG 2.2 criteria that affect prototypes, applied while defining the system, and the audit skill explains which OpenPencil lint results to trust. ([#43](https://github.com/leonextlevel/open-prototypen-cli/issues/43))
 
 ### Changed
 
