@@ -10,6 +10,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `system apply` gives every page a neutral gray background slightly apart from all token colors, or the `pageBackground` declared in `system.yaml`, so screen frame edges stay visible; `validate canvas` warns `page-background` about pages that differ. ([#30](https://github.com/leonextlevel/open-prototypen-cli/issues/30))
 - `interactions.yaml` accepts `scenarios` with initial values, which the prototype shows as controls in a panel beside the screens, with a Reset that restores them and returns to the initial screen; `prototype` warns `unused-scenario` and `unknown-scenario-value`. ([#6](https://github.com/leonextlevel/open-prototypen-cli/issues/6))
 - `system apply` reports variables in its collection that `system.yaml` no longer declares as `extra`, and `--prune` deletes them, refusing variables still bound to nodes unless `--force` is passed; `validate canvas` warns `token-undeclared` about them. ([#8](https://github.com/leonextlevel/open-prototypen-cli/issues/8))
+- `validate canvas` warns `token-label` when a text on the `Design System` page names a token followed by a value that differs from `system.yaml`, so sample labels no longer go stale silently. ([#10](https://github.com/leonextlevel/open-prototypen-cli/issues/10))
 
 ### Changed
 

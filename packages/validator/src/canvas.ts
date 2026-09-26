@@ -2,6 +2,7 @@ import { loadConfig } from '../../core/src/index.js';
 import {
   pageBackground,
   readDesignSystem,
+  type DesignToken,
   sameTokenValue,
   systemPath,
   tokenValue,
@@ -151,6 +152,73 @@ function insideComponent(
     seen.add(id);
   }
   return false;
+}
+
+// Token samples carry labels such as `color.text  #111111`. The value is read from the text
+// between a token's name and the next token name, so a label may describe several tokens.
+function tokenLabelWarnings(
+  tokens: DesignToken[],
+  nodes: Map<string, NativeNode>,
+): CanvasFinding[] {
+  const escape = (value: string) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // A name must not continue with characters that could extend it into another token name.
+  const pattern = new RegExp(
+    [...tokens]
+      .sort((a, b) => b.name.length - a.name.length)
+      .map((token) => `(?<![\\w./-])${escape(token.name)}(?![\\w/-]|\\.\\w)`)
+      .join('|'),
+    'g',
+  );
+  const byName = new Map(tokens.map((token) => [token.name, token]));
+  const warnings: CanvasFinding[] = [];
+  for (const node of nodes.values()) {
+    if (
+      node.type !== 'TEXT' ||
+      !node.text ||
+      pageOf(node, nodes)?.name !== DESIGN_SYSTEM_PAGE ||
+      insideComponent(node, nodes)
+    )
+      continue;
+    const matches = [...node.text.matchAll(pattern)];
+    for (const [index, match] of matches.entries()) {
+      const token = byName.get(match[0]);
+      if (!token) continue;
+      const end = matches[index + 1]?.index ?? node.text.length;
+      const segment = node.text.slice(match.index + match[0].length, end);
+      const shown = labelValue(token, segment);
+      if (shown !== undefined)
+        warnings.push({
+          code: 'token-label',
+          message: `Sample label for ${token.name} shows ${shown}; manifest is ${String(token.value)}. Update the label on ${DESIGN_SYSTEM_PAGE}.`,
+        });
+    }
+  }
+  return warnings;
+}
+// Returns the value a label shows when it differs from the token, or undefined.
+function labelValue(token: DesignToken, segment: string): string | undefined {
+  if (token.type === 'COLOR') {
+    const shown = /#[0-9a-f]{8}\b|#[0-9a-f]{6}\b/i.exec(segment)?.[0];
+    const opaque = (value: string) =>
+      value.toLowerCase().replace(/^(#[0-9a-f]{6})ff$/, '$1');
+    return shown && opaque(shown) !== opaque(token.value) ? shown : undefined;
+  }
+  if (token.type === 'FLOAT') {
+    const shown = /-?\d+(?:\.\d+)?/.exec(segment)?.[0];
+    return shown !== undefined &&
+      Math.abs(Number(shown) - token.value) > 0.00001
+      ? shown
+      : undefined;
+  }
+  if (token.type === 'BOOLEAN') {
+    const shown = /\b(true|false)\b/i.exec(segment)?.[0];
+    return shown && shown.toLowerCase() !== String(token.value)
+      ? shown
+      : undefined;
+  }
+  const shown = segment.replace(/^[\s|:=–—-]+/, '').trim();
+  return shown && !shown.includes(token.value) ? shown : undefined;
 }
 
 function pageBackgroundWarnings(
@@ -321,6 +389,7 @@ export function validateCanvas(
       ...undeclared,
       ...masterPageWarnings(components, nodes),
       ...masterLabelWarnings(components, nodes),
+      ...tokenLabelWarnings(system.tokens, nodes),
       ...pageBackgroundWarnings(native.pages, pageBackground(system)),
     ],
     summary,

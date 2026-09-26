@@ -366,6 +366,47 @@ it('warns about text that repeats a master name on the Design System page', asyn
   ]);
 }, 60000);
 
+it('warns about token sample labels that show a stale value', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const flow = figma.currentPage;
+    const system = figma.createPage(); system.name = 'Design System';
+    figma.currentPage = system;
+    const text = (value, parent) => {
+      const node = figma.createText(); node.characters = value;
+      if (parent) parent.appendChild(node);
+      return node;
+    };
+    text('color.surface  #112233');
+    text('color.surface | #222222');
+    text('space.md 16px');
+    text('space.md');
+    text('Spacing 24');
+    text('color.surface #112233\\nspace.md 12');
+    const row = figma.createComponent(); row.name = 'BookRow/default'; row.resize(300, 80);
+    text('color.surface #999999', row);
+    figma.currentPage = flow;
+    text('color.surface #333333');
+  `,
+    true,
+  );
+  expect(
+    validateCanvas(root, {})
+      .warnings.filter((warning) => warning.code === 'token-label')
+      .map((warning) => warning.message),
+  ).toEqual([
+    expect.stringContaining(
+      'Sample label for color.surface shows #222222; manifest is #112233',
+    ),
+    expect.stringContaining(
+      'Sample label for space.md shows 16; manifest is 12',
+    ),
+  ]);
+}, 60000);
+
 it('chooses a neutral page background slightly apart from every token color', () => {
   const root = fixture();
   const system = (colors: string[], extra = '') => {
