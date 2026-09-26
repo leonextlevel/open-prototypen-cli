@@ -1,12 +1,15 @@
 import { execFileSync } from 'node:child_process';
 import {
+  copyFileSync,
   existsSync,
   mkdirSync,
+  mkdtempSync,
   readFileSync,
   renameSync,
   rmSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { workspace } from '../../core/src/index.js';
 
@@ -49,6 +52,9 @@ export function evalDocument(
   const file = figPath(project);
   if (!existsSync(file))
     throw new Error(`OpenPencil document does not exist: ${file}`);
+  return evalFile(file, code, write);
+}
+function evalFile(file: string, code: string, write = false): unknown {
   const result = run(
     ['eval', file, '--stdin', '--json', ...(write ? ['--write'] : [])],
     code,
@@ -182,6 +188,57 @@ export function renderFrame(
     renameSync(temporary, output);
   } finally {
     rmSync(temporary, { force: true });
+  }
+  return output;
+}
+// OpenPencil exports pages with a transparent background and ignores page fills, so export from a
+// temporary copy with an opaque rectangle behind the page content. The project file is untouched.
+export function renderPage(
+  project: string,
+  page: string,
+  output: string,
+  background: { r: number; g: number; b: number },
+): string {
+  const file = figPath(project);
+  if (!existsSync(file))
+    throw new Error(`OpenPencil document does not exist: ${file}`);
+  const directory = mkdtempSync(join(tmpdir(), 'open-prototypen-page-'));
+  try {
+    const copy = join(directory, 'page.fig');
+    copyFileSync(file, copy);
+    const result = evalFile(
+      copy,
+      `
+      const page = figma.root.children.find((item) => item.name === ${JSON.stringify(page)});
+      if (!page) return { error: 'missing' };
+      const nodes = page.children;
+      if (!nodes.length) return { error: 'empty' };
+      const left = Math.min(...nodes.map((node) => node.x));
+      const top = Math.min(...nodes.map((node) => node.y));
+      const right = Math.max(...nodes.map((node) => node.x + node.width));
+      const bottom = Math.max(...nodes.map((node) => node.y + node.height));
+      figma.currentPage = page;
+      const backdrop = figma.createRectangle();
+      backdrop.name = 'open-prototypen background';
+      backdrop.fills = [{ type: 'SOLID', color: { ...${JSON.stringify(background)}, a: 1 }, opacity: 1, visible: true, blendMode: 'NORMAL' }];
+      page.insertChild(0, backdrop);
+      // A margin keeps content off the image edges.
+      const margin = 32;
+      backdrop.resize(right - left + 2 * margin, bottom - top + 2 * margin);
+      backdrop.x = left - margin; backdrop.y = top - margin;
+      return { pages: figma.root.children.map((item) => item.name) };`,
+      true,
+    ) as { error?: string; pages?: string[] };
+    if (result.error === 'missing') throw new Error(`Unknown page: ${page}`);
+    if (result.error === 'empty') throw new Error(`Page ${page} is empty`);
+    mkdirSync(dirname(output), { recursive: true });
+    const temporary = join(directory, 'page.png');
+    run(['export', copy, '-f', 'png', '--page', page, '-o', temporary]);
+    if (!existsSync(temporary))
+      throw new Error(`OpenPencil did not produce ${output}`);
+    copyFileSync(temporary, output);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
   return output;
 }

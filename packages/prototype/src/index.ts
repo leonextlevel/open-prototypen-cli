@@ -13,11 +13,17 @@ import {
   resolveProjectLanguage,
   workspace,
 } from '../../core/src/index.js';
+import {
+  pageBackground,
+  readDesignSystem,
+  tokenValue,
+} from '../../core/src/system.js';
 import { packageRoot } from '../../schemas/src/index.js';
 import {
   inspectCanvas,
   pngSize,
   renderFrame,
+  renderPage,
   sameSize,
   type Bounds,
   type DesignNode,
@@ -367,6 +373,58 @@ export function renderScreens(project: string, screen?: string): string[] {
       join(workspace(project), 'prototype/renders', `${name}.png`),
       frame.bounds,
     ),
+  );
+}
+export { DESIGN_SYSTEM_PAGE } from '../../validator/src/canvas.js';
+export function pageRenderPath(project: string, page: string): string {
+  const slug = page
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (!slug) throw new Error(`Cannot name a render for page ${page}`);
+  // Pages render outside renders/<screen>.png, since design-system is also a valid screen key.
+  return join(workspace(project), 'prototype/renders/pages', `${slug}.png`);
+}
+// An explicit color wins, then a declared canvas token, then the page background system apply sets.
+function pageRenderBackground(project: string, background?: string): string {
+  if (background) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(background))
+      throw new Error(`Expected --background as #RRGGBB, got ${background}`);
+    return background;
+  }
+  let system: ReturnType<typeof readDesignSystem>;
+  try {
+    system = readDesignSystem(project);
+  } catch {
+    return '#FFFFFF';
+  }
+  const canvas = system.tokens.find(
+    (token) =>
+      token.type === 'COLOR' &&
+      ['color/canvas', 'color.canvas'].includes(token.name),
+  );
+  return canvas && canvas.type === 'COLOR'
+    ? canvas.value.slice(0, 7)
+    : pageBackground(system);
+}
+export function renderPages(
+  project: string,
+  pages: string[],
+  background?: string,
+): string[] {
+  const color = pageRenderBackground(project, background);
+  const rgb = tokenValue({ name: 'background', type: 'COLOR', value: color });
+  if (typeof rgb !== 'object') throw new Error('Invalid background color');
+  const outputs = pages.map((page) => pageRenderPath(project, page));
+  const duplicate = outputs.find(
+    (output, index) => outputs.indexOf(output) !== index,
+  );
+  if (duplicate)
+    throw new Error(`Two pages would render to the same file: ${duplicate}`);
+  return pages.map((page, index) =>
+    renderPage(project, page, outputs[index] as string, rgb),
   );
 }
 export function validatePrototypeCanvas(project: string): CanvasValidation {

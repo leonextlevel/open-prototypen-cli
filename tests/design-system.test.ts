@@ -8,6 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
 import { afterEach, expect, it } from 'vitest';
 import {
   pageBackground,
@@ -17,6 +18,7 @@ import {
 import { initProject, installSkills } from '../packages/harness/src/index.js';
 import {
   evalDocument,
+  figPath,
   inspectCanvas,
   relativeBounds,
   renderFrame,
@@ -28,6 +30,8 @@ import {
 } from '../packages/openpencil/src/system.js';
 import {
   compilePrototype,
+  pageRenderPath,
+  renderPages,
   renderScreens,
 } from '../packages/prototype/src/index.js';
 import { validateCanvas } from '../packages/validator/src/canvas.js';
@@ -452,6 +456,112 @@ it('warns about token sample labels that show a stale value', async () => {
       'Sample label for space.md shows 16; manifest is 12',
     ),
   ]);
+}, 60000);
+
+// Decodes an 8-bit RGB or RGBA PNG into its pixels.
+function pngPixels(file: string): {
+  width: number;
+  channels: number;
+  data: Buffer;
+} {
+  const png = readFileSync(file);
+  let offset = 8;
+  const idat: Buffer[] = [];
+  let width = 0,
+    height = 0,
+    channels = 0;
+  while (offset < png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString('ascii', offset + 4, offset + 8);
+    const body = png.subarray(offset + 8, offset + 8 + length);
+    if (type === 'IHDR') {
+      width = body.readUInt32BE(0);
+      height = body.readUInt32BE(4);
+      expect(body[8]).toBe(8);
+      channels = ({ 2: 3, 6: 4 } as Record<number, number>)[body[9] ?? 0] ?? 0;
+      expect(channels).toBeGreaterThan(0);
+    }
+    if (type === 'IDAT') idat.push(body);
+    offset += length + 12;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * channels;
+  const data = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const value = raw[y * (stride + 1) + 1 + x] ?? 0;
+      const left = x >= channels ? (data[y * stride + x - channels] ?? 0) : 0;
+      const up = y > 0 ? (data[(y - 1) * stride + x] ?? 0) : 0;
+      const corner =
+        x >= channels && y > 0
+          ? (data[(y - 1) * stride + x - channels] ?? 0)
+          : 0;
+      const paeth = () => {
+        const p = left + up - corner;
+        const [a, b, c] = [
+          Math.abs(p - left),
+          Math.abs(p - up),
+          Math.abs(p - corner),
+        ];
+        return a <= b && a <= c ? left : b <= c ? up : corner;
+      };
+      const predictor =
+        [0, left, up, (left + up) >> 1, paeth()][filter ?? 0] ?? 0;
+      data[y * stride + x] = (value + predictor) & 0xff;
+    }
+  }
+  return { width, channels, data };
+}
+
+it('exports pages with an opaque background without changing the project file', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const system = figma.createPage(); system.name = 'Design System';
+    figma.currentPage = system;
+    const row = figma.createComponent(); row.name = 'BookRow/default'; row.resize(120, 40);
+    row.fills = [{ type: 'SOLID', color: { r: 0.1, g: 0.1, b: 0.1, a: 1 }, opacity: 1 }];
+    const swatch = figma.createRectangle(); swatch.resize(40, 40); swatch.x = 200; swatch.y = 60;
+    swatch.fills = [{ type: 'SOLID', color: { r: 1, g: 0, b: 0, a: 1 }, opacity: 1 }];
+  `,
+    true,
+  );
+  const before = readFileSync(figPath(root));
+  const [output] = renderPages(root, ['Design System']);
+  expect(output).toBe(pageRenderPath(root, 'Design System'));
+  expect(output).toMatch(/renders\/pages\/design-system\.png$/);
+  expect(readFileSync(figPath(root)).equals(before)).toBe(true);
+  const image = pngPixels(output ?? '');
+  if (image.channels === 4)
+    for (let index = 3; index < image.data.length; index += 4)
+      expect(image.data[index]).toBe(255);
+  // The top-right pixel lies outside both nodes and shows the page background system apply chose.
+  const corner = (pixels: ReturnType<typeof pngPixels>) => {
+    const offset = (pixels.width - 1) * pixels.channels;
+    return [...pixels.data.subarray(offset, offset + 3)];
+  };
+  expect(
+    '#' +
+      corner(image)
+        .map((value) => value.toString(16).padStart(2, '0'))
+        .join('')
+        .toUpperCase(),
+  ).toBe(pageBackground(readDesignSystem(root)));
+  renderPages(root, ['Design System'], '#00ff00');
+  expect(corner(pngPixels(output ?? ''))).toEqual([0, 255, 0]);
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'tokens:',
+      "tokens:\n  - name: color.canvas\n    type: COLOR\n    value: '#0000ff'",
+    ),
+  );
+  renderPages(root, ['Design System']);
+  expect(corner(pngPixels(output ?? ''))).toEqual([0, 0, 255]);
+  expect(() => renderPages(root, ['Missing'])).toThrow('Unknown page: Missing');
 }, 60000);
 
 it('chooses a neutral page background slightly apart from every token color', () => {
