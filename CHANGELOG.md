@@ -11,6 +11,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `interactions.yaml` accepts `scenarios` with initial values, which the prototype shows as controls in a panel beside the screens, with a Reset that restores them and returns to the initial screen; `prototype` warns `unused-scenario` and `unknown-scenario-value`. ([#6](https://github.com/leonextlevel/open-prototypen-cli/issues/6))
 - `system apply` reports variables in its collection that `system.yaml` no longer declares as `extra`, and `--prune` deletes them, refusing variables still bound to nodes unless `--force` is passed; `validate canvas` warns `token-undeclared` about them. ([#8](https://github.com/leonextlevel/open-prototypen-cli/issues/8))
 - `validate canvas` warns `token-label` when a text on the `Design System` page names a token followed by a value that differs from `system.yaml`, so sample labels no longer go stale silently. ([#10](https://github.com/leonextlevel/open-prototypen-cli/issues/10))
+- `validate canvas` warns `component-screen-undeclared` when a component, directly or through a nested instance, appears on a screen its contract does not list, and `component-unused` when a master has no linked instance. ([#11](https://github.com/leonextlevel/open-prototypen-cli/issues/11))
 
 ### Changed
 

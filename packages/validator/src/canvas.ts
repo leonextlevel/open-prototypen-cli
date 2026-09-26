@@ -2,6 +2,7 @@ import { loadConfig } from '../../core/src/index.js';
 import {
   pageBackground,
   readDesignSystem,
+  type DesignSystem,
   type DesignToken,
   sameTokenValue,
   systemPath,
@@ -152,6 +153,45 @@ function insideComponent(
     seen.add(id);
   }
   return false;
+}
+
+// The inverse of the screen check: instances on screens their component does not declare, and
+// masters without any linked instance, including instances inside other masters.
+function componentUsageWarnings(
+  system: DesignSystem,
+  screenFrames: Record<string, string>,
+  components: NativeNode[],
+  instances: NativeNode[],
+  nodes: Map<string, NativeNode>,
+): CanvasFinding[] {
+  const warnings: CanvasFinding[] = [];
+  const used = new Set(
+    instances.flatMap((node) => linkedMaster(node, nodes) ?? []),
+  );
+  for (const [screen, frameId] of Object.entries(screenFrames)) {
+    if (!nodes.has(frameId)) continue;
+    const reported = new Set<string>();
+    for (const node of instances) {
+      const master = linkedMaster(node, nodes);
+      if (!master || !descendsFrom(node, frameId, nodes)) continue;
+      const name = nodes.get(master)?.name.split('/')[0]?.trim() ?? '';
+      const entry = system.components.find((item) => item.name === name);
+      if (!entry || entry.screens.includes(screen) || reported.has(name))
+        continue;
+      reported.add(name);
+      warnings.push({
+        code: 'component-screen-undeclared',
+        message: `Component ${name} appears on screen ${screen}, which its screens in system.yaml do not list`,
+      });
+    }
+  }
+  for (const master of components)
+    if (!used.has(master.id) && pageOf(master, nodes)?.name !== INTERNAL_PAGE)
+      warnings.push({
+        code: 'component-unused',
+        message: `Component master ${master.name} has no linked instance`,
+      });
+  return warnings;
 }
 
 // Token samples carry labels such as `color.text  #111111`. The value is read from the text
@@ -390,6 +430,13 @@ export function validateCanvas(
       ...masterPageWarnings(components, nodes),
       ...masterLabelWarnings(components, nodes),
       ...tokenLabelWarnings(system.tokens, nodes),
+      ...componentUsageWarnings(
+        system,
+        screenFrames,
+        components,
+        instances,
+        nodes,
+      ),
       ...pageBackgroundWarnings(native.pages, pageBackground(system)),
     ],
     summary,
