@@ -23,6 +23,7 @@ import { applyDesignSystem } from '../packages/openpencil/src/system.js';
 import {
   compilePrototype,
   renderScreens,
+  resolveInteractions,
 } from '../packages/prototype/src/index.js';
 import { packageRoot } from '../packages/schemas/src/index.js';
 import { pixel, pngPixels } from './png.js';
@@ -852,4 +853,71 @@ ${variantActions}
     ).replace('status-message: Payment', 'pay-button: Payment'),
   );
   expect(() => renderScreens(root)).toThrow('is not a text node');
+}, 60000);
+
+it('warns about small hotspots unless the WCAG spacing exception applies', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'open-prototypen-targets-'));
+  projects.push(root);
+  initProject(root, 'codex');
+  mkdirSync(join(root, 'docs/design/design'), { recursive: true });
+  writeFileSync(
+    join(root, 'docs/design/design/system.yaml'),
+    "version: 1\ntokens:\n  - name: color.surface\n    type: COLOR\n    value: '#112233'\ncomponents:\n  - name: Probe\n    states: [default]\n",
+  );
+  await applyDesignSystem(root);
+  // name, x, y, size
+  const nodes: [string, number, number, number][] = [
+    ['close', 10, 10, 16],
+    ['menu', 30, 10, 16],
+    ['lonely', 200, 20, 12],
+    ['big', 100, 100, 40],
+    ['edge', 142, 110, 16],
+    ['first', 10, 150, 16],
+    ['second', 30, 150, 16],
+  ];
+  evalDocument(
+    root,
+    `
+    const screen = figma.createFrame(); screen.name = 'screen'; screen.resize(300, 200);
+    for (const [name, x, y, size] of ${JSON.stringify(nodes)}) {
+      const node = figma.createRectangle(); node.name = name; node.resize(size, size);
+      screen.appendChild(node); node.x = x; node.y = y;
+    }
+  `,
+    true,
+  );
+  const tree = inspectCanvas(root).tree;
+  const screen = tree.find((node) => node.name === 'screen');
+  setRefs(root, [
+    { id: screen?.id ?? '', ref: 'screen' },
+    ...(screen?.children ?? []).map((node) => ({
+      id: node.id,
+      ref: node.name,
+    })),
+  ]);
+  const action = (name: string, when = '') =>
+    `      ${name}:\n        node: ${name}\n        label: ${name}\n        action: set-state\n        key: mode\n        value: '${name}'${when}\n`;
+  writeFileSync(
+    join(root, 'docs/design/prototype/interactions.yaml'),
+    `version: 1\ninitialScreen: screen\nscreens:\n  screen:\n    frame: screen\n    title: Screen\n    content: Screen.\n    actions:\n${[
+      'close',
+      'menu',
+      'lonely',
+      'big',
+      'edge',
+    ]
+      .map((name) => action(name))
+      .join(
+        '',
+      )}${action('first', '\n        when: { key: mode, value: close }')}${action('second', '\n        when: { key: mode, value: menu }')}`,
+  );
+  expect(
+    resolveInteractions(root)
+      .warnings.filter((warning) => warning.code === 'small-target')
+      .map((warning) => warning.message.split(':')[0]),
+  ).toEqual([
+    'Action screen.close',
+    'Action screen.menu',
+    'Action screen.edge',
+  ]);
 }, 60000);
