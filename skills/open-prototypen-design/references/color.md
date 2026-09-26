@@ -29,7 +29,7 @@ Read this when choosing palette roles, building color scales, placing the accent
 
 - **Constraint.** Text needs a contrast ratio of at least 4.5:1 against its background, and large text (at least 24 px, or 18.66 px bold) at least 3:1 ([WCAG 2.2, 1.4.3 Contrast (Minimum)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)).
 - **Constraint.** Meaningful non-text UI, such as input borders, focus indicators, icons that carry meaning, and chart elements, needs at least 3:1 against adjacent colors ([WCAG 2.2, 1.4.11 Non-text Contrast](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html)). Disabled controls are exempt, but should still read as present.
-- **Default.** Check the real pairs the screens use, including text on the accent, secondary text on raised surfaces, and placeholder text, not only the main text on the canvas. Record intentional exceptions in `system.md`.
+- **Default.** Check the real pairs the screens use, including text on the accent, secondary text on raised surfaces, and placeholder text, not only the main text on the canvas. Declare them in the `contrast` list of `system.yaml`, as [the design system reference](design-system.md) shows, so the CLI computes each ratio and warns `contrast-pair`, and mark intentional exceptions `exempt` with a reason.
 
 ## Dark themes
 

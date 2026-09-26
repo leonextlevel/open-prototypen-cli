@@ -34,6 +34,22 @@ components:
     screens: [collection]
 ```
 
+- **Constraint.** Declare the color pairs the screens rely on in an optional `contrast` list, each with a `use`: `text` (4.5:1), `large-text` (3:1), `non-text` (3:1), or `exempt` with a `reason`, for disabled controls and decoration. Both tokens must be declared COLOR tokens, and the background must be opaque; a translucent foreground is composited over its background. `system apply`, `inspect system --json`, and `validate canvas` warn `contrast-pair` when a pair falls below its threshold. Declare text levels on each surface, the foreground on the accent, and focus on its backgrounds, not every combination.
+
+```yaml
+contrast:
+  - foreground: color/text/secondary
+    background: color/surface
+    use: text
+  - foreground: color/border/interactive
+    background: color/canvas
+    use: non-text
+  - foreground: color/text/disabled
+    background: color/surface
+    use: exempt
+    reason: Disabled controls
+```
+
 - **Constraint.** A component name may be namespaced with `/`, such as `icon/check`; state names cannot contain `/`, so the last segment of a master's name is its state. Declare each icon as a component whose states are its size and color variants, with masters named `icon/check/16-muted` and `icon/check/24-accent`.
 - **Constraint.** After editing the contract, run `open-prototypen system apply`. It creates the `.fig` if necessary, synchronizes variables, and paints every page with a neutral gray close to the palette's page color but visibly apart from each opaque token color, so screen frames stand out. Set `pageBackground: '#RRGGBB'` at the top level to choose it; the value must be a neutral gray not too close to any token color. `system apply` does not compose the page, components, or screens.
 - **Constraint.** Bind token variables to meaningful properties in component masters and shared screen structures, rather than binding each token once while matching copies stay hardcoded. A token bound only to its own sample is not applied: `validate canvas` warns `token-sample-only` when every binding of a variable lies on `Design System` outside component masters. Bind it in a master, whose instances inherit the binding, or in a shared structure, such as the `itemSpacing` of an auto-layout list.

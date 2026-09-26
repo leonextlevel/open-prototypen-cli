@@ -37,11 +37,21 @@ const componentSchema = z.object({
     .min(1),
   screens: z.array(z.string().regex(/^[a-z][a-z0-9-]*$/)).default([]),
 });
+// Color pairs the design relies on, checked against WCAG 2.2 contrast thresholds.
+const contrastSchema = z
+  .object({
+    foreground: name,
+    background: name,
+    use: z.enum(['text', 'large-text', 'non-text', 'exempt']),
+    reason: z.string().trim().min(1).optional(),
+  })
+  .strict();
 const systemSchema = z
   .object({
     version: z.literal(1),
     tokens: z.array(tokenSchema).min(1),
     components: z.array(componentSchema).min(1),
+    contrast: z.array(contrastSchema).default([]),
     pageBackground: z
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/)
@@ -69,6 +79,32 @@ const systemSchema = z
           path: ['tokens', index, 'name'],
         });
       tokenNames.add(token.name);
+    }
+    for (const [index, pair] of system.contrast.entries()) {
+      for (const role of ['foreground', 'background'] as const) {
+        const token = system.tokens.find((item) => item.name === pair[role]);
+        if (token?.type !== 'COLOR')
+          context.addIssue({
+            code: 'custom',
+            message: `Contrast pair ${role} ${pair[role]} is not a declared COLOR token`,
+            path: ['contrast', index, role],
+          });
+        else if (
+          role === 'background' &&
+          /^#[0-9a-fA-F]{6}(?![fF]{2}$)[0-9a-fA-F]{2}$/.test(token.value)
+        )
+          context.addIssue({
+            code: 'custom',
+            message: `Contrast pair background ${pair.background} is translucent, so its contrast depends on what lies below it`,
+            path: ['contrast', index, 'background'],
+          });
+      }
+      if (pair.use === 'exempt' && !pair.reason)
+        context.addIssue({
+          code: 'custom',
+          message: 'An exempt contrast pair needs a reason',
+          path: ['contrast', index, 'reason'],
+        });
     }
     const componentNames = new Set<string>();
     for (const [index, component] of system.components.entries()) {
@@ -246,4 +282,67 @@ export function pageBackground(system: DesignSystem): string {
     ? clear.reduce((a, b) => (b.offset < a.offset ? b : a))
     : grays.reduce((a, b) => (b.distance > a.distance ? b : a));
   return hexColor(best.color);
+}
+
+// WCAG 2.2 relative luminance of an sRGB color.
+function relativeLuminance({ r, g, b }: Rgb): number {
+  const linear = (value: number) =>
+    value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b);
+}
+export function contrastRatio(first: Rgb, second: Rgb): number {
+  const [light, dark] = [
+    relativeLuminance(first),
+    relativeLuminance(second),
+  ].sort((a, b) => b - a) as [number, number];
+  return (light + 0.05) / (dark + 0.05);
+}
+const CONTRAST_THRESHOLDS = { text: 4.5, 'large-text': 3, 'non-text': 3 };
+export type ContrastResult = {
+  foreground: string;
+  background: string;
+  use: 'text' | 'large-text' | 'non-text';
+  ratio: number;
+  required: number;
+};
+// The contrast of every declared, non-exempt pair; a translucent foreground is composited over its
+// background first.
+export function contrastPairs(system: DesignSystem): ContrastResult[] {
+  const color = (name: string) => {
+    const token = system.tokens.find((item) => item.name === name);
+    const value = token && tokenValue(token);
+    return typeof value === 'object' ? value : undefined;
+  };
+  return system.contrast.flatMap((pair) => {
+    if (pair.use === 'exempt') return [];
+    const foreground = color(pair.foreground);
+    const background = color(pair.background);
+    if (!foreground || !background) return [];
+    const alpha = foreground.a;
+    const composited = {
+      r: foreground.r * alpha + background.r * (1 - alpha),
+      g: foreground.g * alpha + background.g * (1 - alpha),
+      b: foreground.b * alpha + background.b * (1 - alpha),
+    };
+    return [
+      {
+        foreground: pair.foreground,
+        background: pair.background,
+        use: pair.use,
+        ratio: contrastRatio(composited, background),
+        required: CONTRAST_THRESHOLDS[pair.use],
+      },
+    ];
+  });
+}
+// Ratios are truncated, never rounded up, so a failing pair never shows its threshold.
+export function contrastWarnings(
+  system: DesignSystem,
+): { code: string; message: string }[] {
+  return contrastPairs(system)
+    .filter((pair) => pair.ratio < pair.required)
+    .map((pair) => ({
+      code: 'contrast-pair',
+      message: `${pair.foreground} on ${pair.background} has a contrast ratio of ${(Math.floor(pair.ratio * 100) / 100).toFixed(2)}:1, below the ${pair.required}:1 WCAG 2.2 requires for ${pair.use}`,
+    }));
 }

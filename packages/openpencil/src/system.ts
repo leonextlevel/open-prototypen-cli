@@ -3,6 +3,7 @@ import { dirname, extname, resolve } from 'node:path';
 import { BUILTIN_IO_FORMATS, IORegistry } from '@open-pencil/core/io';
 import { SceneGraph } from '@open-pencil/scene-graph';
 import {
+  contrastWarnings,
   hexColor,
   pageBackground,
   readDesignSystem,
@@ -105,6 +106,8 @@ export async function applyDesignSystem(
   pageBackground: string;
   // Pages whose background was changed to pageBackground.
   pages: string[];
+  // Declared color pairs below their WCAG threshold.
+  contrast: { code: string; message: string }[];
 }> {
   const system = readDesignSystem(project);
   const file = figPath(project);
@@ -235,6 +238,7 @@ export async function applyDesignSystem(
     pruned: pruned.map((variable) => variable.name),
     pageBackground: background,
     pages: pages.map((page) => page.name),
+    contrast: contrastWarnings(system),
   };
 }
 

@@ -12,6 +12,8 @@ import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { afterEach, expect, it } from 'vitest';
 import {
+  contrastPairs,
+  contrastWarnings,
   pageBackground,
   readDesignSystem,
   systemPath,
@@ -925,6 +927,70 @@ it('renders text in project fonts and warns about missing faces', async () => {
   renderFrame(root, frame?.id ?? '', output, undefined, { warnings });
   expect(warnings).toEqual([]);
   expect(inked()).toBe(true);
+}, 60000);
+
+it('checks the contrast of declared color pairs against WCAG thresholds', async () => {
+  const root = fixture();
+  const color = (name: string, value: string) =>
+    `  - name: ${name}\n    type: COLOR\n    value: '${value}'\n`;
+  const manifest = (contrast: string) =>
+    readFileSync(systemPath(root), 'utf8')
+      .replace(/contrast:[\s\S]*$/, '')
+      .replace(
+        'tokens:\n',
+        `tokens:\n${color('color.white', '#FFFFFF')}${color('color.pass-text', '#767676')}${color('color.fail-text', '#777777')}${color('color.pass-ui', '#949494')}${color('color.fail-ui', '#959595')}${color('color.scrim', '#00000080')}`,
+      ) + `contrast:\n${contrast}`;
+  const pair = (foreground: string, use: string, extra = '') =>
+    `  - foreground: ${foreground}\n    background: color.white\n    use: ${use}\n${extra}`;
+  writeFileSync(
+    systemPath(root),
+    manifest(
+      [
+        pair('color.pass-text', 'text'),
+        pair('color.fail-text', 'text'),
+        pair('color.pass-ui', 'large-text'),
+        pair('color.fail-ui', 'non-text'),
+        pair('color.scrim', 'text'),
+        pair('color.scrim', 'large-text'),
+        pair('color.fail-ui', 'exempt', '    reason: Disabled controls\n'),
+      ].join(''),
+    ),
+  );
+  const system = readDesignSystem(root);
+  expect(contrastPairs(system).map((entry) => entry.ratio.toFixed(2))).toEqual([
+    '4.54',
+    '4.48',
+    '3.03',
+    '3.00',
+    '4.00',
+    '4.00',
+  ]);
+  expect(contrastWarnings(system).map((warning) => warning.message)).toEqual([
+    'color.fail-text on color.white has a contrast ratio of 4.47:1, below the 4.5:1 WCAG 2.2 requires for text',
+    'color.fail-ui on color.white has a contrast ratio of 2.99:1, below the 3:1 WCAG 2.2 requires for non-text',
+    'color.scrim on color.white has a contrast ratio of 4.00:1, below the 4.5:1 WCAG 2.2 requires for text',
+  ]);
+  expect((await applyDesignSystem(root)).contrast).toHaveLength(3);
+  expect(
+    validateCanvas(root, {}).warnings.filter(
+      (warning) => warning.code === 'contrast-pair',
+    ),
+  ).toHaveLength(3);
+  for (const [contrast, message] of [
+    [
+      pair('color.missing', 'text'),
+      'color.missing is not a declared COLOR token',
+    ],
+    [pair('space.md', 'text'), 'space.md is not a declared COLOR token'],
+    [
+      '  - foreground: color.white\n    background: color.scrim\n    use: text\n',
+      'color.scrim is translucent',
+    ],
+    [pair('color.fail-ui', 'exempt'), 'An exempt contrast pair needs a reason'],
+  ]) {
+    writeFileSync(systemPath(root), manifest(contrast));
+    expect(() => readDesignSystem(root)).toThrow(message);
+  }
 }, 60000);
 
 it('chooses a neutral page background slightly apart from every token color', () => {

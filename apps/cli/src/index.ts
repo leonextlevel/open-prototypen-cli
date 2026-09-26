@@ -8,7 +8,10 @@ import {
   projectSummary,
   resolveProjectLanguage,
 } from '../../../packages/core/src/index.js';
-import { readDesignSystem } from '../../../packages/core/src/system.js';
+import {
+  contrastPairs,
+  readDesignSystem,
+} from '../../../packages/core/src/system.js';
 import {
   initProject,
   installSkills,
@@ -212,6 +215,7 @@ inspect
     output(
       {
         contract: readDesignSystem(root()),
+        contrast: contrastPairs(readDesignSystem(root())),
         native: inspectNativeSystem(root()),
       },
       options.json,
