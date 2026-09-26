@@ -24,6 +24,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The design skill has a color reference on role-based palettes, tonal scales, accent discipline, semantic separation, WCAG contrast, and dark themes. ([#34](https://github.com/leonextlevel/open-prototypen-cli/issues/34))
 - `render` loads project fonts from `docs/design/assets/fonts/<Family>/<Style>.ttf` or `.otf` without the network, `render --web-fonts` fetches missing families from web font providers, and `render` and `validate canvas` warn `font-substitution` about faces whose text would be missing from renders. ([#36](https://github.com/leonextlevel/open-prototypen-cli/issues/36))
 - The design skill has a typography reference on typeface choice, hierarchy, reading comfort, numeric type, localization, and which faces render. ([#35](https://github.com/leonextlevel/open-prototypen-cli/issues/35))
+- The design skill has a layout reference on layout grammar, grouping, spacing scales, hierarchy, density, radius, borders, elevation, and responsive rules, and asks for radius and elevation samples on the `Design System` page. ([#37](https://github.com/leonextlevel/open-prototypen-cli/issues/37))
 
 ### Changed
 
