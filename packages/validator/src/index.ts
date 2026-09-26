@@ -1,10 +1,10 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { relative } from 'node:path';
+import { existsSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import matter from 'gray-matter';
 import type { Content, Heading, PhrasingContent } from 'mdast';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
-import { artifactPath, loadConfig } from '../../core/src/index.js';
+import { artifactPath, loadConfig, workspace } from '../../core/src/index.js';
 import { readDesignSystem } from '../../core/src/system.js';
 import { getDefinition, loadRegistry } from '../../schemas/src/index.js';
 
@@ -19,7 +19,32 @@ export type ArtifactResult = {
 export type ArtifactState = ArtifactResult & {
   state: 'valid' | 'invalid' | 'draft' | 'ready' | 'blocked' | 'optional';
   blockedBy: string[];
+  // Warnings do not change the state.
+  warnings: Finding[];
 };
+
+// Files the audit describes, relative to the workspace.
+const AUDITED_FILES = [
+  'prototype/prototype.fig',
+  'design/system.yaml',
+  'prototype/interactions.yaml',
+];
+// Modification times follow checkouts and copies, so this is a hint rather than proof.
+function auditWarnings(project: string, report: string): Finding[] {
+  const audited = statSync(report).mtimeMs;
+  const newer = AUDITED_FILES.filter((file) => {
+    const path = join(workspace(project), file);
+    return existsSync(path) && statSync(path).mtimeMs > audited;
+  });
+  return newer.length
+    ? [
+        {
+          code: 'audit-stale',
+          message: `The audit report is older than ${newer.join(', ')}; re-check the changed prototype and update the report`,
+        },
+      ]
+    : [];
+}
 
 function headingText(node: Heading): string {
   const text = (children: PhrasingContent[]): string =>
@@ -198,7 +223,11 @@ export function status(project: string): ArtifactState[] {
         : blockedBy.length
           ? 'blocked'
           : 'ready';
-    const entry = { ...result, state, blockedBy };
+    const warnings =
+      id === 'audit-report' && result.exists
+        ? auditWarnings(project, artifactPath(project, id))
+        : [];
+    const entry = { ...result, state, blockedBy, warnings };
     cache.set(id, entry);
     return entry;
   };

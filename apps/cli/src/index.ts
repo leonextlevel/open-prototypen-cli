@@ -114,7 +114,7 @@ program
         : states
             .map(
               (item) =>
-                `${item.state.padEnd(9)} ${item.artifact}${item.blockedBy.length ? ` (blocked by ${item.blockedBy.join(', ')})` : ''}`,
+                `${item.state.padEnd(9)} ${item.artifact}${item.blockedBy.length ? ` (blocked by ${item.blockedBy.join(', ')})` : ''}${item.warnings.map((warning) => `\n          warning: ${warning.message}`).join('')}`,
             )
             .join('\n'),
       options.json,
