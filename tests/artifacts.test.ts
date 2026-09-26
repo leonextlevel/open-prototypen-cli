@@ -177,6 +177,8 @@ ${[
       'Achado fundamentado nesta seção.',
     );
     expect(report).toContain('## Error Recovery');
+    expect(report).toContain('## Product Fit and Genericity');
+    expect(report).toContain('## Cross-Screen Consistency');
     expect(report).toContain('## Resolution');
     writeFileSync(path, report);
     expect(validateArtifact(root, 'audit-report', false).findings).toEqual([]);

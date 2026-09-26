@@ -25,7 +25,15 @@ TODO: Check navigation, task completion, empty/error/selected states, and action
 
 ## Visual Findings
 
-TODO: Review hierarchy, typography, spacing, alignment, contrast, icons, and product fit from the exported images.
+TODO: Review hierarchy, typography, spacing, alignment, contrast, icons, and product fit from the exported images, using the design skill's review questions.
+
+## Product Fit and Genericity
+
+TODO: Optional. Record where the screens serve or miss this product's context, and generic patterns that neither the product nor the direction justifies, with the "why this?" answers found or missing.
+
+## Cross-Screen Consistency
+
+TODO: Optional. Record drift between screens: action hierarchy, terminology, density, the look of equivalent states, and the design signature.
 
 ## Native System Findings
 
