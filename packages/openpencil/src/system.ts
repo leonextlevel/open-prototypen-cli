@@ -238,15 +238,21 @@ export async function applyDesignSystem(
   };
 }
 
+// Gap between an automatically placed import and the page's existing content.
+const IMPORT_GAP = 32;
 export function importSvg(
   project: string,
   svgPath: string,
   name?: string,
+  options: { page?: string; x?: number; y?: number; component?: boolean } = {},
 ): {
   document: string;
   id: string;
   name: string;
   type: string;
+  page: string;
+  x: number;
+  y: number;
 } {
   const file = resolve(svgPath);
   if (extname(file).toLowerCase() !== '.svg')
@@ -278,9 +284,25 @@ export function importSvg(
     project,
     `
     const { importSVG } = await import('@open-pencil/core/tools');
-    const result = await importSVG.execute(figma, {
-      svg: ${JSON.stringify(svg)}, name: ${JSON.stringify(importedName)}
+    const pageName = ${JSON.stringify(options.page ?? null)};
+    const page = pageName === null
+      ? figma.currentPage
+      : figma.root.children.find((item) => item.name === pageName);
+    if (!page) return { error: 'Unknown page: ' + pageName };
+    // Without coordinates, place the import to the right of the page's content so imports never stack.
+    const content = page.children;
+    let x = ${JSON.stringify(options.x ?? null)}, y = ${JSON.stringify(options.y ?? null)};
+    if (x === null)
+      x = content.length ? Math.max(...content.map((node) => node.x + node.width)) + ${IMPORT_GAP} : 0;
+    if (y === null) y = content.length ? Math.min(...content.map((node) => node.y)) : 0;
+    let result = await importSVG.execute(figma, {
+      svg: ${JSON.stringify(svg)}, name: ${JSON.stringify(importedName)},
+      parent_id: page.id, x, y
     });
+    if (result?.id && ${JSON.stringify(Boolean(options.component))}) {
+      const master = figma.createComponentFromNode(figma.getNodeById(result.id));
+      result = { id: master.id, name: master.name, type: master.type };
+    }
     // OpenPencil maps stroke-linecap and stroke-linejoin onto each stroke, but saves only the
     // node-level strokeCap and strokeJoin, so copy them there before saving.
     const graph = figma.graph;
@@ -296,13 +318,19 @@ export function importSvg(
       for (const child of node.childIds ?? []) visit(child);
     };
     if (result?.id) visit(result.id);
-    return result;`,
+    return { ...result, page: page.name };`,
     true,
-  ) as { id?: string; name?: string; type?: string; error?: string };
+  ) as {
+    id?: string;
+    name?: string;
+    type?: string;
+    page?: string;
+    error?: string;
+  };
   if (result.error || !result.id || !result.name || !result.type)
     throw new Error(result.error ?? 'OpenPencil could not import SVG');
   const imported = inspectCanvas(project).tree.find(
-    (node) => node.name === importedName,
+    (node) => node.name === importedName && node.page === result.page,
   );
   if (!imported)
     throw new Error(`Imported SVG ${importedName} was not found after saving`);
@@ -311,5 +339,8 @@ export function importSvg(
     id: imported.id,
     name: imported.name,
     type: imported.type,
+    page: imported.page ?? result.page ?? '',
+    x: imported.x,
+    y: imported.y,
   };
 }
