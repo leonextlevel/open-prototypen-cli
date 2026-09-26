@@ -75,9 +75,20 @@ const actionSchema = z.discriminatedUnion('action', [
       ),
   }),
 ]);
+// Scenarios simulate outcomes outside the product's control, such as a server response, from a
+// runtime panel outside the screens instead of drawn controls.
+const scenarioSchema = z.object({
+  key: id,
+  label: z.string().min(1),
+  initial: z.string(),
+  values: z
+    .array(z.object({ value: z.string(), label: z.string().min(1) }))
+    .min(2),
+});
 const interactionsSchema = z.object({
   version: z.literal(1),
   initialScreen: id,
+  scenarios: z.array(scenarioSchema).default([]),
   screens: z.record(
     id,
     z.object({
@@ -104,6 +115,24 @@ export function readInteractions(project: string): Interactions {
       if ('target' in action && action.target && !data.screens[action.target])
         throw new Error(`Unknown target ${action.target} in ${screen}.${name}`);
     }
+  const keys = new Set<string>();
+  for (const scenario of data.scenarios) {
+    if (keys.has(scenario.key))
+      throw new Error(`Duplicate scenario key: ${scenario.key}`);
+    keys.add(scenario.key);
+    const values = scenario.values.map((entry) => entry.value);
+    const duplicate = values.find(
+      (value, index) => values.indexOf(value) !== index,
+    );
+    if (duplicate !== undefined)
+      throw new Error(
+        `Duplicate value ${duplicate} in scenario ${scenario.key}`,
+      );
+    if (!values.includes(scenario.initial))
+      throw new Error(
+        `Initial value ${scenario.initial} of scenario ${scenario.key} is not one of its values: ${values.join(', ')}`,
+      );
+  }
   return data;
 }
 export type PrototypeWarning = CanvasFinding;
@@ -231,7 +260,7 @@ function coveredActionWarnings(
       ? [
           {
             code: 'covered-action',
-            message: `Action ${screen}.${earlier.name} can never be clicked: ${screen}.${cover.name}, declared later on the same node, is active whenever it is. Give actions that share a node when conditions on the same key with different values.`,
+            message: `Action ${screen}.${earlier.name} can never be clicked: ${screen}.${cover.name}, declared later on the same node, is active whenever it is. Declare the default action first and give the later action on the same node a when condition that differs.`,
           },
         ]
       : [];
@@ -255,6 +284,33 @@ function reachabilityWarnings(interactions: Interactions): PrototypeWarning[] {
       message: `Screen ${screen} cannot be reached from ${interactions.initialScreen} through any action target`,
     }));
 }
+function scenarioWarnings(interactions: Interactions): PrototypeWarning[] {
+  const warnings: PrototypeWarning[] = [];
+  const conditions = Object.entries(interactions.screens).flatMap(
+    ([screen, entry]) =>
+      Object.entries(entry.actions).flatMap(([name, action]) =>
+        action.when ? [{ name: `${screen}.${name}`, when: action.when }] : [],
+      ),
+  );
+  for (const scenario of interactions.scenarios) {
+    const used = conditions.filter(
+      (condition) => condition.when.key === scenario.key,
+    );
+    if (!used.length)
+      warnings.push({
+        code: 'unused-scenario',
+        message: `Scenario ${scenario.key} is not used by any action's when condition, so switching it changes nothing`,
+      });
+    const values = scenario.values.map((entry) => entry.value);
+    for (const condition of used)
+      if (!values.includes(condition.when.value))
+        warnings.push({
+          code: 'unknown-scenario-value',
+          message: `Action ${condition.name} waits for ${scenario.key} = ${condition.when.value}, which scenario ${scenario.key} does not declare (${values.join(', ')})`,
+        });
+  }
+  return warnings;
+}
 export function resolveInteractions(
   project: string,
   interactions = readInteractions(project),
@@ -269,7 +325,11 @@ export function resolveInteractions(
   );
   return {
     screens,
-    warnings: [...warnings, ...reachabilityWarnings(interactions)],
+    warnings: [
+      ...warnings,
+      ...reachabilityWarnings(interactions),
+      ...scenarioWarnings(interactions),
+    ],
   };
 }
 export function inspectScreen(project: string, screen: string) {
@@ -391,6 +451,7 @@ export function compilePrototype(project: string): {
   const manifest = {
     version: 1,
     initialScreen: interactions.initialScreen,
+    scenarios: interactions.scenarios,
     screens,
   };
   writeFileSync(

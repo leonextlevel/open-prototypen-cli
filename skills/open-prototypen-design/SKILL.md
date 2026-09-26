@@ -52,7 +52,7 @@ screens:
 
 Replace the example references with the references assigned in the `.fig`; an action can add `part: <layer name>` when `node` is an instance. Give every screen a title and a textual account of its meaningful visible content; give every action a label in the user's language. These fields are required because PNG text is inaccessible to screen readers. Other actions are `open-overlay`, which shows the target screen as a modal centered over the dimmed current screen, or anchored to its bottom edge with `placement: bottom` for bottom sheets, and `close-overlay`; `set-state` takes `key`, `value`, and an optional target screen; `external-link` takes an HTTP(S) `url`. An optional `when: {key, value}` makes an action active only for that state.
 
-Simulate outcomes the prototype cannot compute, such as a server error or a resource conflict, with runtime state. State starts empty and lasts for the visit, so a `when` action is inactive until a `set-state` action sets its key. When active actions share a node, only the one declared last gets a hotspot, for pointer, keyboard, and screen reader users alike. Declare the default action first and the state-specific override after it on the same node; a `covered-action` warning means an earlier action can never be clicked.
+Simulate outcomes the prototype cannot compute, such as a server error or a resource conflict, with runtime state. State lasts for the visit and starts empty, except for declared scenarios, so a `when` action is inactive until a scenario or a `set-state` action sets its key. Use scenarios for outcomes outside the product's control, such as a server response, and keep `set-state` for choices the product user makes. When active actions share a node, only the one declared last gets a hotspot, for pointer, keyboard, and screen reader users alike. Declare the default action first and the state-specific override after it on the same node; a `covered-action` warning means an earlier action can never be clicked.
 
 The exit from an error state leads to a screen that reflects the error and lets the user complete the task by another path. Choose the pattern by whether retrying can succeed:
 
@@ -71,7 +71,17 @@ The exit from an error state leads to a screen that reflects the error and lets 
 
   `order-error` shows the rejection and gives a retry action that navigates to `confirmation`.
 
-- **Resource conflict**, where retrying the same request cannot succeed, such as a booking form where the slot was just taken. Never let a retry book the lost resource. Let a visible, clearly labeled scenario control (for example "<Prototype: simulate taken slot>") set the state, and override the default action while it is set:
+- **Resource conflict**, where retrying the same request cannot succeed, such as a booking form where the slot was just taken. Never let a retry book the lost resource. Declare a scenario, which the prototype shows as a control in a panel beside the screens, and override the default action while it is set; do not draw simulation controls into product frames:
+
+  ```yaml
+  scenarios:
+    - key: slot
+      label: '<Slot availability in the user language>'
+      initial: free
+      values:
+        - { value: free, label: '<Available>' }
+        - { value: taken, label: '<Taken by someone else>' }
+  ```
 
   ```yaml
   actions:
@@ -90,4 +100,4 @@ The exit from an error state leads to a screen that reflects the error and lets 
 
   `slot-taken` shows the lost slot as unavailable and lets the user choose another one and finish the booking.
 
-Replace the placeholders with labels in the user's language.
+Replace the placeholders with labels in the user's language. A scenario's `initial` value is set when the prototype opens and after the panel's Reset, which also clears history and returns to the initial screen. `unused-scenario` warns about a scenario that no `when` uses, and `unknown-scenario-value` about a `when` waiting for a value its scenario does not declare.

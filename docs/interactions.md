@@ -72,6 +72,24 @@ Give screens a `title` and `content`, and actions a `label`, in the project's la
 | `set-state`     | `key`, `value`, optional `target`        | Store runtime state; optionally navigate.                                                                                                                                                                                                                                                                               |
 | `external-link` | HTTP(S) `url`                            | Open a link in a new tab.                                                                                                                                                                                                                                                                                               |
 
-Any action can add `when: {key: ..., value: ...}` to become available only when that state has been set. When several active actions share a node, only the one declared last gets a hotspot, so pointer, keyboard, and screen reader users all reach the same action; `covered-action` warns when an action can never be clicked because a later one on the same node is active whenever it is. Declare the default action first and the state-specific override after it on the same node. The runtime keeps state in memory for the current visit. It does not synthesize visual states inside a PNG: use a target screen when the visual response must change. To simulate an outcome the prototype cannot compute, such as a server error or a resource conflict, let a visible control set the state (for example a scenario toggle or a first attempt that fails) and give the overriding action a `when` that leads to the matching state screen. The exit from an error state leads to a screen that reflects the error and lets the user complete the task by another path: a retry may succeed after a transient failure, but a resource someone else just took stays unavailable and the user finishes with another one.
+Any action can add `when: {key: ..., value: ...}` to become available only when that state has been set. When several active actions share a node, only the one declared last gets a hotspot, so pointer, keyboard, and screen reader users all reach the same action; `covered-action` warns when an action can never be clicked because a later one on the same node is active whenever it is. Declare the default action first and the state-specific override after it on the same node. The runtime keeps state in memory for the current visit. It does not synthesize visual states inside a PNG: use a target screen when the visual response must change. To simulate an outcome the prototype cannot compute, such as a server error or a resource conflict, declare a scenario, or let a first attempt that fails set the state, and give the overriding action a `when` that leads to the matching state screen. The exit from an error state leads to a screen that reflects the error and lets the user complete the task by another path: a retry may succeed after a transient failure, but a resource someone else just took stays unavailable and the user finishes with another one.
 
 Keyboard focus follows each action. A screen change moves focus to the new screen's title, which screen readers announce. A `set-state` without a target keeps focus on the same hotspot, which may now run a different action. Closing an overlay, by action, Escape, or backdrop click, returns focus to the hotspot that opened it.
+
+## Scenarios
+
+Scenarios simulate outcomes outside the product's control, such as a server response or an expired deadline, without drawing simulation controls into product frames. Declare them at the top level of `interactions.yaml`:
+
+```yaml
+scenarios:
+  - key: outcome
+    label: Server response
+    initial: ok
+    values:
+      - { value: ok, label: Success }
+      - { value: error, label: Server error }
+```
+
+The prototype shows a panel beside the screens with one labeled control per scenario and a Reset button. Each scenario sets its key to `initial` when the prototype opens, so a default action can already be gated by `when`. Changing a control sets the key and redraws the current screen, keeping focus in the panel. Reset restores the initial values, clears other state and history, and returns to `initialScreen`. Overlays never make the panel inert. Keep `set-state` for choices the product user makes.
+
+`prototype` rejects duplicate scenario keys, duplicate values, and an `initial` that is not one of the values. It warns `unused-scenario` when no action's `when` uses a scenario key, and `unknown-scenario-value` when a `when` on a scenario key waits for a value the scenario does not declare.
