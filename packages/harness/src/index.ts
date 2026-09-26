@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -92,7 +93,9 @@ export function installSkills(
     throw new Error('No installed harness found. Pass --harness.');
   const installed: string[] = [],
     unchanged: string[] = [],
-    modified: string[] = [];
+    modified: string[] = [],
+    removed: string[] = [];
+  const shipped = new Set<string>();
   for (const harness of harnesses)
     for (const name of skillNames)
       for (const file of sourceFiles(join(packageRoot(), 'skills', name))) {
@@ -105,6 +108,7 @@ export function installSkills(
           file === 'SKILL.md'
             ? `${harness}/${name}`
             : `${harness}/${name}/${file}`;
+        shipped.add(key);
         if (existsSync(target)) {
           const current = readFileSync(target, 'utf8');
           if (current === source) {
@@ -125,6 +129,29 @@ export function installSkills(
         manifest.skills[key] = digest(source);
         installed.push(key);
       }
+  // Files a previous version installed but this one no longer ships, such as a renamed reference,
+  // are removed unless they were edited locally.
+  for (const [key, recorded] of Object.entries(manifest.skills)) {
+    const [harness, name, ...rest] = key.split('/');
+    if (
+      shipped.has(key) ||
+      !harnesses.includes(harness as Harness) ||
+      !name ||
+      !rest.length
+    )
+      continue;
+    const target = skillPath(project, harness as Harness, name, rest.join('/'));
+    if (
+      existsSync(target) &&
+      digest(readFileSync(target, 'utf8')) !== recorded
+    ) {
+      modified.push(key);
+      continue;
+    }
+    rmSync(target, { force: true });
+    delete manifest.skills[key];
+    removed.push(key);
+  }
   mkdirSync(dirname(manifestPath(project)), { recursive: true });
   manifest.toolVersion = (
     JSON.parse(readFileSync(join(packageRoot(), 'package.json'), 'utf8')) as {
@@ -135,7 +162,7 @@ export function installSkills(
     manifestPath(project),
     JSON.stringify(manifest, null, 2) + '\n',
   );
-  return { installed, unchanged, modified };
+  return { installed, unchanged, modified, removed };
 }
 export function initProject(
   project: string,

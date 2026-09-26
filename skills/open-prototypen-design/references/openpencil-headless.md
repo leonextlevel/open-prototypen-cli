@@ -111,3 +111,8 @@ Changing a bound spacing variable with `system apply` updates the padding and ga
 - `open-prototypen svg import <file> --name <name>` places the vector group on the first page, to the right of its content. Pass `--page "Design System"` to import there instead, `--x` and `--y` to choose the position, and `--component` to make the import a master directly; name reused icons as `icon/<name>` masters and place instances in screens. `--json` returns the node's `id`, `name`, `type`, `page`, `x`, and `y`.
 - Inspect the `Design System` page with `open-prototypen render --system`, or any page with `render --page <name>`. A plain `openpencil export --page` has a transparent background, because OpenPencil ignores page fills on export; the Open Prototypen command exports from a temporary copy with an opaque background (`--background <hex>`, else a `color/canvas` or `color.canvas` token, else the page background from `system apply`). Place a new master in free space next to its family, then check the export for overlaps.
 - New pages come from `figma.createPage()`; set `figma.currentPage` before creating nodes on a page. Pages are listed in `figma.root.children`, which may include an internal canvas; find pages by name.
+
+## Sources
+
+- OpenPencil [scripting](https://openpencil.dev/programmable/cli/scripting) and [CLI](https://openpencil.dev/reference/cli) documentation: the script API, variables, components, and export options.
+- Behavior of the pinned `@open-pencil/cli` 0.15.1, verified with small scripts on copies of a document, and Open Prototypen's tests. These are observations of one version, not documented guarantees; re-verify after upgrading OpenPencil.

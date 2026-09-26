@@ -82,6 +82,19 @@ git push --force-with-lease
 
 The maintainer merges approved pull requests; GitHub then deletes the branch and closes the linked issues. Rebasing gives the commits new hashes on `main`.
 
+## Design references
+
+The design skill keeps its procedure in `skills/open-prototypen-design/SKILL.md` and its design knowledge in focused files under `references/`, which the skill lists with when to read each one. Agents load a reference only for the decision in front of them, so keep each one short enough to read in one go, and link to another reference instead of repeating it. Keep OpenPencil and contract mechanics in `design-system.md` and `openpencil-headless.md`, and design knowledge in the topic references.
+
+Mark every point with its guidance class, so a heuristic is never read as a rule:
+
+- **Constraint**: checked by the CLI or by a standard such as WCAG.
+- **Default**: follow it unless the product gives a reason, and record the reason.
+- **Heuristic**: depends on context; weigh it.
+- **Decision**: the agent's creative choice, explained in the direction or system.
+
+End each reference with a `Sources` section that summarizes each source in the project's own words, says what the reference took from it, and separates standards from this project's opinion. Do not copy long passages. Other skills link to references by relative path, such as `../open-prototypen-design/references/design-system.md`.
+
 ## Changelog and versions
 
 For every notable user-facing change, add a short entry under the appropriate `Added`, `Changed`, `Fixed`, `Deprecated`, `Removed`, or `Security` heading in `[Unreleased]` in `CHANGELOG.md`, in the same pull request. Skip internal-only noise. Keep entries understandable without reading commits, and end each one with a full link to the issue it resolves, or several when it covers more than one; a bare `#42` is not linked in a Markdown file:

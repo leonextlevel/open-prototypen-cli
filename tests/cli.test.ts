@@ -62,7 +62,7 @@ it('initializes both harnesses and serves artifact contracts through the CLI', (
     existsSync(
       join(
         root,
-        '.agents/skills/open-prototypen-design/references/visual-system.md',
+        '.agents/skills/open-prototypen-design/references/design-system.md',
       ),
     ),
   ).toBe(true);
