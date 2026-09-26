@@ -357,3 +357,158 @@ screens:
   },
   30000,
 );
+
+it.skipIf(!existsSync('/usr/bin/google-chrome'))(
+  'keeps keyboard focus predictable when actions redraw the prototype',
+  async () => {
+    const root = mkdtempSync(join(tmpdir(), 'open-prototypen-focus-'));
+    projects.push(root);
+    initProject(root, 'codex');
+    writeFileSync(
+      join(root, 'docs/design/config.yaml'),
+      'version: 1\nschema: default\nlanguage:\n  mode: auto\n  fallback: en\ndesignEngine: openpencil\n',
+    );
+    mkdirSync(join(root, 'docs/design/design'), { recursive: true });
+    writeFileSync(
+      join(root, 'docs/design/design/system.yaml'),
+      "version: 1\ntokens:\n  - name: color.surface\n    type: COLOR\n    value: '#112233'\ncomponents:\n  - name: Probe\n    states: [default]\n",
+    );
+    await applyDesignSystem(root);
+    evalDocument(
+      root,
+      `
+      const home = figma.createFrame(); home.name = 'home'; home.resize(300, 160);
+      for (const [name, x] of [['toggle', 20], ['open', 110], ['next', 200]]) {
+        const node = figma.createRectangle(); node.name = name; node.resize(60, 30);
+        home.appendChild(node); node.x = x; node.y = 20;
+      }
+      const sheet = figma.createFrame(); sheet.name = 'sheet'; sheet.resize(200, 80); sheet.x = 400;
+      const close = figma.createRectangle(); close.name = 'close'; close.resize(60, 30);
+      sheet.appendChild(close); close.x = 20; close.y = 20;
+      const detail = figma.createFrame(); detail.name = 'detail'; detail.resize(200, 160); detail.x = 700;
+      const back = figma.createRectangle(); back.name = 'back'; back.resize(60, 30);
+      detail.appendChild(back); back.x = 20; back.y = 20;
+    `,
+      true,
+    );
+    const tree = inspectCanvas(root).tree;
+    const id = (name: string) => {
+      const visit = (nodes: typeof tree): string | undefined =>
+        nodes
+          .map((node) =>
+            node.name === name ? node.id : visit(node.children ?? []),
+          )
+          .find(Boolean);
+      return visit(tree) ?? '';
+    };
+    setRefs(
+      root,
+      [
+        'home',
+        'toggle',
+        'open',
+        'next',
+        'sheet',
+        'close',
+        'detail',
+        'back',
+      ].map((ref) => ({ id: id(ref), ref })),
+    );
+    writeFileSync(
+      join(root, 'docs/design/prototype/interactions.yaml'),
+      `version: 1
+initialScreen: home
+screens:
+  home:
+    frame: home
+    title: Home
+    content: Home screen.
+    actions:
+      toggle:
+        node: toggle
+        label: Show details
+        action: set-state
+        key: details
+        value: shown
+      toggle-off:
+        node: toggle
+        label: Hide details
+        when: { key: details, value: shown }
+        action: set-state
+        key: details
+        value: hidden
+      open:
+        node: open
+        label: Open sheet
+        action: open-overlay
+        target: sheet
+      next:
+        node: next
+        label: Next
+        action: navigate
+        target: detail
+  sheet:
+    frame: sheet
+    title: Sheet
+    content: Sheet content.
+    actions:
+      close:
+        node: close
+        label: Close sheet
+        action: close-overlay
+  detail:
+    frame: detail
+    title: Detail
+    content: Detail screen.
+    actions:
+      back:
+        node: back
+        label: Back
+        action: back
+`,
+    );
+    renderScreens(root);
+    const result = compilePrototype(root);
+    const browser = await chromium.launch({
+      executablePath: '/usr/bin/google-chrome',
+      headless: true,
+      args: ['--no-sandbox'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.goto(pathToFileURL(join(result.output, 'index.html')).href);
+      const focused = () =>
+        page.evaluate(() => {
+          const element = document.activeElement;
+          return element?.tagName === 'H1'
+            ? `heading:${element.textContent}`
+            : (element?.getAttribute('aria-label') ?? element?.tagName);
+        });
+      const activate = async (name: string) => {
+        await page.getByRole('button', { name }).focus();
+        await page.keyboard.press('Enter');
+      };
+      // A set-state without a target keeps focus on the same slot, now showing the next action.
+      await activate('Show details');
+      expect(await focused()).toBe('Hide details');
+      await activate('Open sheet');
+      expect(
+        await page.evaluate(() => document.activeElement?.getAttribute('role')),
+      ).toBe('dialog');
+      await page.keyboard.press('Escape');
+      expect(await focused()).toBe('Open sheet');
+      await page.keyboard.press('Enter');
+      await activate('Close sheet');
+      expect(await focused()).toBe('Open sheet');
+      await activate('Next');
+      expect(await focused()).toBe('heading:Detail');
+      await page.keyboard.press('Tab');
+      expect(await focused()).toBe('Back');
+      await page.keyboard.press('Enter');
+      expect(await focused()).toBe('heading:Home');
+    } finally {
+      await browser.close();
+    }
+  },
+  30000,
+);

@@ -73,6 +73,8 @@
       let current = data.initialScreen;
       let overlay = null;
       let placement = 'center';
+      // The hotspot slot on the screen below that opened the current overlay.
+      let opener = null;
 
       function stage(name) {
         const config = data.screens[name];
@@ -96,6 +98,7 @@
         accessible.setAttribute('aria-label', config.title);
         const heading = document.createElement('h1');
         heading.textContent = config.title;
+        heading.tabIndex = -1;
         const content = document.createElement('p');
         content.textContent = config.content;
         accessible.append(heading, content);
@@ -112,6 +115,7 @@
           button.className = 'hotspot';
           button.type = 'button';
           button.setAttribute('aria-label', action.label);
+          button.dataset.slot = action.slot;
           button.style.left = (action.bounds.x / config.width) * 100 + '%';
           button.style.top = (action.bounds.y / config.height) * 100 + '%';
           button.style.width = (action.bounds.width / config.width) * 100 + '%';
@@ -123,7 +127,11 @@
         return root;
       }
 
+      // Every action rebuilds the DOM, so each one says where focus goes next:
+      // the new screen's title, or the hotspot in a slot, which a set-state keeps
+      // and closing an overlay returns to.
       function act(action) {
+        let focus = 'screen';
         switch (action.action) {
           case 'navigate':
             history.push(current);
@@ -135,28 +143,40 @@
             overlay = null;
             break;
           case 'open-overlay':
+            if (!overlay) opener = action.slot;
             overlay = action.target;
             placement = action.placement || 'center';
             break;
           case 'close-overlay':
-            overlay = null;
-            break;
+            closeOverlay();
+            return;
           case 'set-state':
             state[action.key] = action.value;
             if (action.target) {
               history.push(current);
               current = action.target;
               overlay = null;
-            }
+            } else focus = { slot: action.slot };
             break;
           case 'external-link':
             window.open(action.url, '_blank', 'noopener,noreferrer');
             return;
         }
-        draw();
+        draw(focus);
       }
 
-      function draw() {
+      function closeOverlay() {
+        overlay = null;
+        draw({ slot: opener });
+      }
+
+      function focusSlot(layer, slot) {
+        const target =
+          slot && layer.querySelector('[data-slot="' + CSS.escape(slot) + '"]');
+        (target || layer.querySelector('h1')).focus();
+      }
+
+      function draw(focus) {
         const base = stage(current);
         app.replaceChildren(base);
         if (overlay) {
@@ -165,10 +185,7 @@
           const backdrop = document.createElement('div');
           backdrop.className = 'overlay-backdrop';
           backdrop.addEventListener('click', (event) => {
-            if (event.target === backdrop) {
-              overlay = null;
-              draw();
-            }
+            if (event.target === backdrop) closeOverlay();
           });
           const dialog = stage(overlay);
           dialog.setAttribute('role', 'dialog');
@@ -188,19 +205,18 @@
             dialog.style.top =
               box.bottom - data.screens[overlay].height * scale + 'px';
           }
-          dialog.focus();
-        }
+          if (focus && focus.slot) focusSlot(dialog, focus.slot);
+          else dialog.focus();
+        } else if (focus) focusSlot(base, focus.slot);
         document.body.dataset.screen = current;
         document.body.dataset.overlay = overlay || '';
       }
       window.addEventListener('resize', () => {
-        if (overlay && placement === 'bottom') draw();
+        if (overlay && placement === 'bottom')
+          draw({ slot: document.activeElement.dataset.slot });
       });
       document.addEventListener('keydown', (event) => {
-        if (event.key === 'Escape' && overlay) {
-          overlay = null;
-          draw();
-        }
+        if (event.key === 'Escape' && overlay) closeOverlay();
       });
       draw();
     </script>
