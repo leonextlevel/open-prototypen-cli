@@ -37,7 +37,7 @@ Read this while defining the system and composing screens, not only before the a
 
 ## What the CLI checks
 
-- `validate canvas` and `prototype` check structure: labels exist, hotspots lie inside frames, and screens are reachable. `small-target` covers the 24 px minimum for action hotspots. Contrast, focus appearance, and reflow need visual review of the renders unless a CLI warning covers them.
+- `validate canvas` and `prototype` check structure: labels exist, hotspots lie inside frames, and screens are reachable. `small-target` covers the 24 px minimum for action hotspots, and `contrast-pair` the declared color pairs in `system.yaml`. Contrast, focus appearance, and reflow need visual review of the renders unless a CLI warning covers them.
 - OpenPencil's own lint has limits in this workflow. Its `color-contrast` rule skips text whose fill is bound to a variable, which is how this workflow builds screens, always requires 4.5:1 even for large text, and only compares against ancestors' fills. Its `touch-target-size` rule matches layer names and asks for 44 by 44 px, which is the enhanced level, and knows nothing of the prototype's action nodes. Treat its reports as leads to verify, and its silence as no evidence.
 
 ## Sources

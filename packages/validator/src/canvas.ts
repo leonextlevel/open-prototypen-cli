@@ -1,5 +1,6 @@
 import { loadConfig } from '../../core/src/index.js';
 import {
+  contrastWarnings,
   pageBackground,
   readDesignSystem,
   type DesignSystem,
@@ -490,6 +491,7 @@ export function validateCanvas(
     valid: findings.length === 0,
     findings,
     warnings: [
+      ...contrastWarnings(system),
       ...sampleWarnings,
       ...missingFonts(project).map(({ family, style, nodes: users }) => ({
         code: 'font-substitution',
