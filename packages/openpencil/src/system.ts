@@ -461,3 +461,131 @@ export function importSvgVariants(
     masters,
   };
 }
+
+type Rgba = { r: number; g: number; b: number; a: number };
+export type TextContrastSample = {
+  root: string;
+  name: string;
+  text: string;
+} & (
+  | {
+      foreground: Rgba;
+      background: Rgba;
+      fontSize: number;
+      fontWeight: number;
+    }
+  | { unchecked: string }
+);
+// Reads, in one pass, the color each visible text node renders in and the solid background behind
+// it, within the given roots. Bound fills render with their variable's value. The background is the
+// nearest opaque layer, found among earlier siblings that fully cover the text box and ancestors'
+// fills, with translucent layers above it composited. Stacks the check cannot trust, such as
+// gradients, images, partial overlaps, or translucent groups, are returned as unchecked; a root
+// without an opaque background is unchecked unless `skipOpen` lists it.
+export function textContrastSamples(
+  project: string,
+  roots: string[],
+  skipOpen: string[] = [],
+): TextContrastSample[] {
+  return evalDocument(
+    project,
+    `
+    const graph = figma.graph;
+    const roots = new Set(${JSON.stringify(roots)});
+    const skipOpen = new Set(${JSON.stringify(skipOpen)});
+    const node = (id) => graph.getNode(id);
+    // Visible paint layers of a node, from top to bottom, or null when one is not a solid color.
+    const layers = (owner, field) => {
+      const result = [];
+      const paints = owner[field] ?? [];
+      for (let index = paints.length - 1; index >= 0; index--) {
+        const paint = paints[index];
+        if (paint.visible === false) continue;
+        if (field === 'fills' && paint.type !== 'SOLID') return null;
+        const bound = owner.boundVariables?.[field + '/' + index + '/color'];
+        const color = bound ? graph.resolveVariable(bound) : paint.color;
+        if (!color || typeof color !== 'object') return null;
+        result.push({ r: color.r, g: color.g, b: color.b, a: (color.a ?? 1) * (paint.opacity ?? 1) * (owner.opacity ?? 1) });
+      }
+      return result;
+    };
+    const absolute = (id) => {
+      let x = 0, y = 0;
+      for (let current = node(id); current && current.type !== 'CANVAS'; current = node(current.parentId)) {
+        x += current.x; y += current.y;
+      }
+      return { x, y };
+    };
+    const rect = (current) => ({ ...absolute(current.id), width: current.width, height: current.height });
+    const covers = (outer, inner) =>
+      outer.x <= inner.x && outer.y <= inner.y &&
+      outer.x + outer.width >= inner.x + inner.width && outer.y + outer.height >= inner.y + inner.height;
+    const overlaps = (a, b) =>
+      a.x < b.x + Math.max(b.width, 1) && b.x < a.x + a.width && a.y < b.y + Math.max(b.height, 1) && b.y < a.y + a.height;
+    const blend = (top, bottom) => ({
+      r: top.r * top.a + bottom.r * (1 - top.a),
+      g: top.g * top.a + bottom.g * (1 - top.a),
+      b: top.b * top.a + bottom.b * (1 - top.a),
+      a: 1,
+    });
+    const sample = (text, root) => {
+      const base = { root, name: text.name, text: (text.text ?? '').trim().slice(0, 40) };
+      const own = layers(text, 'fills');
+      if (!own || own.length !== 1) return { ...base, unchecked: 'text fill is not a single solid color' };
+      // Headless OpenPencil does not measure text, so its default 100×100 box only locates its origin.
+      const measured = !(text.width === 100 && text.height === 100);
+      const position = rect(text);
+      const box = measured ? position : { ...position, width: 0, height: 0 };
+      const found = [];
+      let child = text;
+      for (;;) {
+        const parent = node(child.parentId);
+        if (!parent || parent.type === 'CANVAS') break;
+        if ((parent.opacity ?? 1) < 1 && !roots.has(parent.id))
+          return { ...base, unchecked: 'a translucent group contains the text' };
+        const siblings = parent.childIds.slice(0, parent.childIds.indexOf(child.id)).reverse();
+        for (const id of siblings) {
+          const sibling = node(id);
+          if (!sibling || sibling.visible === false) continue;
+          const area = rect(sibling);
+          if (!overlaps(area, box)) continue;
+          if (!covers(area, box) || sibling.childIds.length || !['RECTANGLE', 'FRAME'].includes(sibling.type))
+            return { ...base, unchecked: 'the text overlaps a shape or group that does not simply cover it' };
+          const paints = layers(sibling, 'fills');
+          if (!paints) return { ...base, unchecked: 'the background is not a solid color' };
+          found.push(...paints);
+          if (found.some((layer) => layer.a >= 0.999)) break;
+        }
+        if (found.some((layer) => layer.a >= 0.999)) break;
+        const paints = layers(parent, 'fills');
+        if (!paints) return { ...base, unchecked: 'the background is not a solid color' };
+        found.push(...paints);
+        if (found.some((layer) => layer.a >= 0.999) || roots.has(parent.id)) break;
+        child = parent;
+      }
+      const bottom = found.findIndex((layer) => layer.a >= 0.999);
+      if (bottom < 0) return skipOpen.has(root) ? null : { ...base, unchecked: 'no opaque background behind the text' };
+      let background = { ...found[bottom], a: 1 };
+      for (let index = bottom - 1; index >= 0; index--) background = blend(found[index], background);
+      return {
+        ...base,
+        foreground: blend(own[0], background),
+        background,
+        fontSize: text.fontSize ?? 0,
+        fontWeight: text.fontWeight ?? 400,
+      };
+    };
+    const samples = [];
+    const visit = (id, root) => {
+      const current = node(id);
+      if (!current || current.visible === false) return;
+      if (current.type === 'TEXT') {
+        const result = sample(current, root);
+        if (result) samples.push(result);
+      }
+      for (const child of current.childIds ?? []) visit(child, root);
+    };
+    for (const root of roots) visit(root, root);
+    return samples;`,
+  ) as TextContrastSample[];
+}
