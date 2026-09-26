@@ -18,6 +18,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `unreachable-screen` follows `when`, `set-state`, and scenarios, so a screen reachable only through an action whose condition can never hold is reported, and `unsatisfiable-when` warns about a `when` value that nothing sets. ([#18](https://github.com/leonextlevel/open-prototypen-cli/issues/18))
 - `validate canvas` warns `component-undeclared` about component masters whose name is not a `<name>/<state>` declared in `system.yaml`. ([#20](https://github.com/leonextlevel/open-prototypen-cli/issues/20))
 - `status` reports per-artifact `warnings` and warns `audit-stale` when the audit report is older than the `.fig`, `system.yaml`, or `interactions.yaml`, so refine loops end with a fresh check. ([#21](https://github.com/leonextlevel/open-prototypen-cli/issues/21))
+- `svg import --variants 16:color/icon/muted,24:color/accent` creates one icon master per size and color, named like `icon/check/16-muted`, rescaled and with its vector paints bound to the COLOR token. ([#22](https://github.com/leonextlevel/open-prototypen-cli/issues/22))
 
 ### Changed
 

@@ -26,7 +26,9 @@ import {
 import {
   applyDesignSystem,
   importSvg,
+  importSvgVariants,
   inspectNativeSystem,
+  parseVariants,
 } from '../packages/openpencil/src/system.js';
 import {
   compilePrototype,
@@ -265,6 +267,99 @@ it('places imported SVGs on a chosen page without stacking them', async () => {
   expect(() => importSvg(root, svg, 'icon-e', { page: 'Missing' })).toThrow(
     'Unknown page: Missing',
   );
+}, 60000);
+
+it('generates icon size and color variants bound to color tokens', async () => {
+  const root = fixture();
+  writeFileSync(
+    systemPath(root),
+    readFileSync(systemPath(root), 'utf8').replace(
+      'tokens:',
+      "tokens:\n  - name: color/icon/muted\n    type: COLOR\n    value: '#667788'\n  - name: color/accent\n    type: COLOR\n    value: '#cc3300'",
+    ),
+  );
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `const page = figma.createPage(); page.name = 'Design System';`,
+    true,
+  );
+  const svg = join(root, 'check.svg');
+  writeFileSync(
+    svg,
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  );
+  const result = importSvgVariants(
+    root,
+    svg,
+    'icon/check',
+    parseVariants('16:color/icon/muted, 24:color/accent'),
+    { page: 'Design System' },
+  );
+  expect(result.masters).toMatchObject([
+    {
+      name: 'icon/check/16-muted',
+      type: 'COMPONENT',
+      x: 0,
+      width: 16,
+      height: 16,
+    },
+    {
+      name: 'icon/check/24-accent',
+      type: 'COMPONENT',
+      x: 48,
+      width: 24,
+      height: 24,
+    },
+  ]);
+  const native = inspectNativeSystem(root);
+  const variable = (name: string) =>
+    native.variables.find((entry) => entry.name === name)?.id;
+  const vectors = evalDocument(
+    root,
+    `return [...figma.graph.getAllNodes()]
+      .filter((node) => node.type === 'VECTOR')
+      .map((node) => ({
+        master: figma.graph.getNode(node.parentId)?.name,
+        bound: node.boundVariables,
+        red: Math.round(node.strokes[0].color.r * 255),
+        cap: node.strokeCap,
+      }));`,
+  ) as {
+    master: string;
+    bound: Record<string, string>;
+    red: number;
+    cap: string;
+  }[];
+  expect(vectors).toEqual([
+    {
+      master: 'icon/check/16-muted',
+      bound: { 'strokes/0/color': variable('color/icon/muted') },
+      red: 0x66,
+      cap: 'ROUND',
+    },
+    {
+      master: 'icon/check/24-accent',
+      bound: { 'strokes/0/color': variable('color/accent') },
+      red: 0xcc,
+      cap: 'ROUND',
+    },
+  ]);
+  expect(() =>
+    importSvgVariants(root, svg, 'icon/x', parseVariants('16:color/missing')),
+  ).toThrow('Unknown token: color/missing');
+  expect(() =>
+    importSvgVariants(root, svg, 'icon/x', parseVariants('16:space.md')),
+  ).toThrow('Token space.md is FLOAT, not a COLOR');
+  expect(() => parseVariants('16')).toThrow('Invalid variant 16');
+  expect(() =>
+    importSvgVariants(
+      root,
+      svg,
+      'icon/y',
+      parseVariants('16:color/accent,16:color/accent'),
+    ),
+  ).toThrow('Two variants would both be named icon/y/16-accent');
 }, 60000);
 
 it('keeps round stroke caps and joins of imported SVG icons after saving', async () => {
