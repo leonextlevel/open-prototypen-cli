@@ -24,6 +24,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - The screen map template maps each state to its own screen key and how it is reached, and has an optional `Rule Coverage` table; product rules get stable IDs, the define skill fills both, and the audit skill walks every demonstrable rule in the prototype. ([#14](https://github.com/leonextlevel/open-prototypen-cli/issues/14))
 - The audit and component review skills describe the handoff when a separate review context cannot write files: the auditor returns the report for the caller to write verbatim, and the component reviewer returns an ordered change list; `docs/workflow.md` says what each review context may change. ([#15](https://github.com/leonextlevel/open-prototypen-cli/issues/15))
 - The headless OpenPencil reference shows how to build auto-layout component masters with padding and gaps bound to spacing variables, and documents that hug sizing is not applied and that instances created in the same script as their master need a later save. ([#16](https://github.com/leonextlevel/open-prototypen-cli/issues/16))
+- Component names in `system.yaml` may be namespaced with `/`, such as `icon/check`, so icon masters like `icon/check/16-muted` can be declared and validated; state names still cannot contain `/`. ([#19](https://github.com/leonextlevel/open-prototypen-cli/issues/19))
 
 ### Fixed
 

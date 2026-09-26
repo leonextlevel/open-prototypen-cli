@@ -386,6 +386,72 @@ it('counts components nested inside other component instances as screen usage', 
   });
 }, 60000);
 
+it('accepts namespaced component names and keeps states unambiguous', async () => {
+  const root = fixture();
+  const manifest = readFileSync(systemPath(root), 'utf8');
+  writeFileSync(
+    systemPath(root),
+    manifest.replace(
+      'components:',
+      'components:\n  - name: icon/check\n    states: [16-muted, 24-accent]\n    screens: [collection]',
+    ),
+  );
+  expect(
+    readDesignSystem(root).components.map((component) => component.name),
+  ).toContain('icon/check');
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `
+    const muted = figma.createComponent(); muted.name = 'icon/check/16-muted';
+    const frame = figma.createFrame(); frame.name = 'collection'; frame.resize(390, 760);
+    frame.appendChild(muted.createInstance());
+  `,
+    true,
+  );
+  const frame = inspectCanvas(root).tree.find(
+    (node) => node.name === 'collection',
+  );
+  const result = validateCanvas(root, { collection: frame?.id ?? '' });
+  expect(
+    result.findings.filter((finding) => finding.message.includes('icon/')),
+  ).toEqual([
+    {
+      code: 'component-state',
+      message:
+        'Expected one native component named icon/check/24-accent; found 0',
+    },
+  ]);
+  // The icon on its declared screen is not reported as undeclared there.
+  expect(
+    result.warnings.filter(
+      (warning) =>
+        warning.code === 'component-screen-undeclared' &&
+        warning.message.includes('icon/check'),
+    ),
+  ).toEqual([]);
+  for (const [components, message] of [
+    [
+      '  - name: icon/check\n    states: [16/muted]',
+      'State name cannot contain /',
+    ],
+    [
+      '  - name: icon//check\n    states: [default]',
+      'segments separated by / cannot be empty',
+    ],
+    [
+      '  - name: /check\n    states: [default]',
+      'segments separated by / cannot be empty',
+    ],
+  ]) {
+    writeFileSync(
+      systemPath(root),
+      manifest.replace(/components:[\s\S]*$/, `components:\n${components}\n`),
+    );
+    expect(() => readDesignSystem(root)).toThrow(message);
+  }
+}, 60000);
+
 it('warns about instances on undeclared screens and unused masters', async () => {
   const root = fixture();
   writeFileSync(

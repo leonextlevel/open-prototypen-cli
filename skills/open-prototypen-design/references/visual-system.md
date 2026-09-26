@@ -33,7 +33,12 @@ components:
   - name: BookRow
     states: [default, selected]
     screens: [collection]
+  - name: icon/check
+    states: [16-muted, 24-accent]
+    screens: [collection]
 ```
+
+A component name may be namespaced with `/`, such as `icon/check`; state names cannot contain `/`, so the last segment of a master's name is its state. Declare each icon as a component whose states are its size and color variants, and name the masters `icon/check/16-muted` and `icon/check/24-accent`.
 
 `system apply` paints every page with a neutral gray close to the palette's page color but at least visibly apart from each opaque token color, so screen frames stand out. Set `pageBackground: '#RRGGBB'` at the top level to choose it yourself; the value must be a neutral gray that is not too close to any token color.
 

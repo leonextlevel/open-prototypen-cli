@@ -171,6 +171,11 @@ function insideComponent(
   return false;
 }
 
+// Masters are named <component>/<state>; the component name may itself contain /.
+function componentName(master: string): string {
+  return master.split('/').slice(0, -1).join('/').trim();
+}
+
 // The inverse of the screen check: instances on screens their component does not declare, and
 // masters without any linked instance, including instances inside other masters.
 function componentUsageWarnings(
@@ -190,7 +195,7 @@ function componentUsageWarnings(
     for (const node of instances) {
       const master = linkedMaster(node, nodes);
       if (!master || !descendsFrom(node, frameId, nodes)) continue;
-      const name = nodes.get(master)?.name.split('/')[0]?.trim() ?? '';
+      const name = componentName(nodes.get(master)?.name ?? '');
       const entry = system.components.find((item) => item.name === name);
       if (!entry || entry.screens.includes(screen) || reported.has(name))
         continue;

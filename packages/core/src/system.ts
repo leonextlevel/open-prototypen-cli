@@ -16,11 +16,16 @@ const tokenSchema = z.discriminatedUnion('type', [
   z.object({ name, type: z.literal('BOOLEAN'), value: z.boolean() }),
 ]);
 const componentSchema = z.object({
+  // A name may be namespaced, such as icon/check; masters are <name>/<state>, and the state is the
+  // last segment.
   name: z
     .string()
     .trim()
     .min(1)
-    .refine((value) => !value.includes('/'), 'Component name cannot contain /'),
+    .refine(
+      (value) => value.split('/').every((segment) => segment.trim()),
+      'Component name segments separated by / cannot be empty',
+    ),
   states: z
     .array(
       z
