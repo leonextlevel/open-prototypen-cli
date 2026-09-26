@@ -272,7 +272,133 @@ function coveredActionWarnings(
       : [];
   });
 }
-function reachabilityWarnings(interactions: Interactions): PrototypeWarning[] {
+// Explored (screen, overlay, state) nodes before falling back to plain target reachability.
+const REACHABILITY_LIMIT = 50000;
+type Visit = { screen: string; overlay: string | null; state: string[] };
+// Follows actions the way the runtime does, over (screen, overlay, state) nodes. State tracks only
+// keys some `when` tests; scenario controls may switch their values at any time. `back` may return
+// to any screen that leads to the current one, which over-approximates the runtime's history.
+export function reachabilityWarnings(
+  interactions: Interactions,
+): PrototypeWarning[] {
+  const { screens, scenarios } = interactions;
+  const entries = Object.entries(screens).flatMap(([screen, entry]) =>
+    Object.entries(entry.actions).map(([name, action]) => ({
+      screen,
+      name,
+      action,
+    })),
+  );
+  const produced = new Map<string, Set<string>>();
+  const produce = (key: string, value: string) =>
+    produced.set(key, (produced.get(key) ?? new Set()).add(value));
+  for (const scenario of scenarios)
+    for (const entry of scenario.values) produce(scenario.key, entry.value);
+  for (const { action } of entries)
+    if (action.action === 'set-state') produce(action.key, action.value);
+  const scenarioKeys = new Set(scenarios.map((scenario) => scenario.key));
+  // Scenario keys get unknown-scenario-value instead.
+  const warnings: PrototypeWarning[] = entries
+    .filter(
+      ({ action }) =>
+        action.when &&
+        !scenarioKeys.has(action.when.key) &&
+        !produced.get(action.when.key)?.has(action.when.value),
+    )
+    .map(({ screen, name, action }) => ({
+      code: 'unsatisfiable-when',
+      message: `Action ${screen}.${name} waits for ${action.when?.key} = ${action.when?.value}, which no set-state action or scenario produces, so it can never run`,
+    }));
+  const keys = [
+    ...new Set(entries.flatMap(({ action }) => action.when?.key ?? [])),
+  ].sort();
+  const index = new Map(keys.map((key, position) => [key, position]));
+  const sources = new Map<string, Set<string>>();
+  for (const { screen, action } of entries)
+    if (
+      (action.action === 'navigate' || action.action === 'set-state') &&
+      action.target
+    )
+      sources.set(
+        action.target,
+        (sources.get(action.target) ?? new Set()).add(screen),
+      );
+  const set = (state: string[], key: string, value: string) => {
+    const position = index.get(key);
+    if (position === undefined || state[position] === value) return state;
+    const next = [...state];
+    next[position] = value;
+    return next;
+  };
+  const initial = keys.map(
+    (key) => scenarios.find((scenario) => scenario.key === key)?.initial ?? '',
+  );
+  const reached = new Set<string>();
+  const seen = new Set<string>();
+  const queue: Visit[] = [
+    { screen: interactions.initialScreen, overlay: null, state: initial },
+  ];
+  const visit = (next: Visit) => {
+    const id = JSON.stringify(next);
+    if (!seen.has(id)) {
+      seen.add(id);
+      queue.push(next);
+    }
+  };
+  seen.add(JSON.stringify(queue[0]));
+  for (let node = queue.shift(); node; node = queue.shift()) {
+    if (seen.size > REACHABILITY_LIMIT)
+      return [...warnings, ...targetOnly(interactions)];
+    const { screen, overlay, state } = node;
+    reached.add(screen);
+    if (overlay) reached.add(overlay);
+    for (const scenario of scenarios)
+      for (const entry of scenario.values)
+        visit({
+          screen,
+          overlay,
+          state: set(state, scenario.key, entry.value),
+        });
+    // An open overlay makes the screen below inert.
+    for (const action of Object.values(
+      screens[overlay ?? screen]?.actions ?? {},
+    )) {
+      if (
+        action.when &&
+        state[index.get(action.when.key) ?? -1] !== action.when.value
+      )
+        continue;
+      switch (action.action) {
+        case 'navigate':
+          visit({ screen: action.target, overlay: null, state });
+          break;
+        case 'back':
+          for (const source of sources.get(screen) ?? [
+            interactions.initialScreen,
+          ])
+            visit({ screen: source, overlay: null, state });
+          break;
+        case 'open-overlay':
+          visit({ screen, overlay: action.target, state });
+          break;
+        case 'close-overlay':
+          visit({ screen, overlay: null, state });
+          break;
+        case 'set-state': {
+          const next = set(state, action.key, action.value);
+          visit(
+            action.target
+              ? { screen: action.target, overlay: null, state: next }
+              : { screen, overlay, state: next },
+          );
+          break;
+        }
+      }
+    }
+  }
+  return [...warnings, ...unreachable(interactions, reached)];
+}
+function targetOnly(interactions: Interactions): PrototypeWarning[] {
   const reached = new Set([interactions.initialScreen]);
   const queue = [interactions.initialScreen];
   for (let screen = queue.shift(); screen; screen = queue.shift())
@@ -283,11 +409,17 @@ function reachabilityWarnings(interactions: Interactions): PrototypeWarning[] {
         reached.add(action.target);
         queue.push(action.target);
       }
+  return unreachable(interactions, reached);
+}
+function unreachable(
+  interactions: Interactions,
+  reached: Set<string>,
+): PrototypeWarning[] {
   return Object.keys(interactions.screens)
     .filter((screen) => !reached.has(screen))
     .map((screen) => ({
       code: 'unreachable-screen',
-      message: `Screen ${screen} cannot be reached from ${interactions.initialScreen} through any action target`,
+      message: `Screen ${screen} cannot be reached from ${interactions.initialScreen} through any action whose when condition can hold`,
     }));
 }
 function scenarioWarnings(interactions: Interactions): PrototypeWarning[] {

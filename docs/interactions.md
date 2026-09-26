@@ -59,7 +59,7 @@ Give screens a `title` and `content`, and actions a `label`, in the project's la
 - A screen `frame` must be a top-level frame of a page. Anything else is rejected before export, so a stale reference cannot overwrite a render.
 - `render` fails when the exported PNG is larger than the frame, which happens when content extends past an unclipped frame. Enable `clipsContent` on screen frames or keep content inside them. `prototype` also rejects renders whose size no longer matches their frame.
 - A hotspot must lie inside its frame. Headless OpenPencil does not measure text and reports text nodes as 100×100, so a text action node that still has that default size produces a warning; size it explicitly or use a sized container or a transparent hit area instead.
-- `prototype` and `validate canvas` warn about screens that no action target can reach from `initialScreen`.
+- `prototype` and `validate canvas` warn `unreachable-screen` about screens that no sequence of actions can reach from `initialScreen`. The check follows actions the way the runtime does: a `when` action counts only in states where its condition holds, `set-state` and scenario controls change the state, and an open overlay makes the screen below inert. `back` may return to any screen that leads to the current one. `unsatisfiable-when` warns about a `when` whose value no `set-state` action produces for that key; for scenario keys, `unknown-scenario-value` reports undeclared values instead. In a prototype with more than 50,000 combinations of screen, overlay, and state, the check falls back to following every action target.
 
 ## Actions
 
