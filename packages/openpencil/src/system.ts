@@ -31,6 +31,16 @@ export type NativeNode = {
   boundVariables: Record<string, string>;
   // Present only on TEXT nodes.
   text?: string;
+  // Present only on frames, components, instances, and rectangles.
+  layoutMode?: string;
+  itemSpacing?: number;
+  padding?: { top: number; right: number; bottom: number; left: number };
+  radius?: {
+    topLeft: number;
+    topRight: number;
+    bottomRight: number;
+    bottomLeft: number;
+  };
 };
 export type NativeSystem = {
   document: string;
@@ -66,7 +76,14 @@ export function inspectNativeSystem(project: string): NativeSystem {
         id: node.id, name: node.name, type: node.type,
         parentId: node.parentId, componentId: node.componentId,
         boundVariables: node.boundVariables,
-        text: node.type === 'TEXT' ? node.text : undefined
+        text: node.type === 'TEXT' ? node.text : undefined,
+        ...(['FRAME', 'COMPONENT', 'INSTANCE', 'RECTANGLE'].includes(node.type) ? {
+          layoutMode: node.layoutMode, itemSpacing: node.itemSpacing,
+          padding: { top: node.paddingTop, right: node.paddingRight, bottom: node.paddingBottom, left: node.paddingLeft },
+          radius: node.independentCorners
+            ? { topLeft: node.topLeftRadius, topRight: node.topRightRadius, bottomRight: node.bottomRightRadius, bottomLeft: node.bottomLeftRadius }
+            : { topLeft: node.cornerRadius, topRight: node.cornerRadius, bottomRight: node.cornerRadius, bottomLeft: node.cornerRadius }
+        } : {})
       })),
       pages: figma.root.children.map((page) => ({
         id: page.id, name: page.name, background: page.backgrounds[0]?.color ?? null

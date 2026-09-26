@@ -52,6 +52,11 @@ const systemSchema = z
     tokens: z.array(tokenSchema).min(1),
     components: z.array(componentSchema).min(1),
     contrast: z.array(contrastSchema).default([]),
+    // Optional scales, each a prefix of FLOAT tokens, such as space/ or radius/.
+    scales: z
+      .object({ spacing: name.optional(), radius: name.optional() })
+      .strict()
+      .optional(),
     pageBackground: z
       .string()
       .regex(/^#[0-9a-fA-F]{6}$/)
@@ -80,6 +85,18 @@ const systemSchema = z
         });
       tokenNames.add(token.name);
     }
+    for (const [scale, prefix] of Object.entries(system.scales ?? {}))
+      if (
+        prefix &&
+        !system.tokens.some(
+          (token) => token.type === 'FLOAT' && token.name.startsWith(prefix),
+        )
+      )
+        context.addIssue({
+          code: 'custom',
+          message: `Scale ${scale} prefix ${prefix} matches no FLOAT token`,
+          path: ['scales', scale],
+        });
     for (const [index, pair] of system.contrast.entries()) {
       for (const role of ['foreground', 'background'] as const) {
         const token = system.tokens.find((item) => item.name === pair[role]);
@@ -345,4 +362,18 @@ export function contrastWarnings(
       code: 'contrast-pair',
       message: `${pair.foreground} on ${pair.background} has a contrast ratio of ${(Math.floor(pair.ratio * 100) / 100).toFixed(2)}:1, below the ${pair.required}:1 WCAG 2.2 requires for ${pair.use}`,
     }));
+}
+
+// The values of a declared scale: every FLOAT token whose name starts with its prefix.
+export function scaleValues(
+  system: DesignSystem,
+  scale: 'spacing' | 'radius',
+): number[] | undefined {
+  const prefix = system.scales?.[scale];
+  if (!prefix) return undefined;
+  return system.tokens.flatMap((token) =>
+    token.type === 'FLOAT' && token.name.startsWith(prefix)
+      ? [token.value]
+      : [],
+  );
 }
