@@ -15,6 +15,7 @@ Read a reference only when the decision in front of you needs it:
 - [Color](references/color.md): when choosing palette roles and scales, placing the accent, adding a dark theme, or checking contrast.
 - [Typography](references/typography.md): when choosing typefaces, defining the type scale, setting text for reading or data, or checking that type renders.
 - [Layout](references/layout.md): when setting a screen's structure, choosing spacing and density, grouping content, or defining radius, borders, and elevation.
+- [Interaction patterns](references/interaction-patterns.md): when choosing navigation, action hierarchy, overlays, safeguards for destructive actions, or how to show a collection.
 - [Design review](references/review.md): when critiquing your renders before handing them to component review.
 - [Design system contract and page](references/design-system.md): when writing `system.yaml`, building the `Design System` page, choosing components and states, or importing icons.
 - [Headless OpenPencil](references/openpencil-headless.md): before scripting edits to the `.fig`.
