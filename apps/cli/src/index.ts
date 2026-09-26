@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import {
   artifactPath,
   dependencyPaths,
@@ -68,6 +68,13 @@ const output = (value: unknown, json?: boolean) =>
         ? value
         : JSON.stringify(value, null, 2),
   );
+
+function coordinate(value: string): number {
+  const number = Number(value);
+  if (value.trim() === '' || !Number.isFinite(number))
+    throw new InvalidArgumentError('Expected a number');
+  return number;
+}
 
 // Templates ship with an English placeholder; artifacts should declare the project's language.
 const localizedTemplate = (template: string) => {
@@ -231,9 +238,31 @@ program
   .description('Manage editable SVG assets in OpenPencil')
   .command('import <file>')
   .option('--name <name>', 'Name of the imported vector group')
+  .option('--page <name>', 'Page to import into (default: the first page)')
+  .option(
+    '--x <number>',
+    'X position (default: right of the page content)',
+    coordinate,
+  )
+  .option(
+    '--y <number>',
+    'Y position (default: top of the page content)',
+    coordinate,
+  )
+  .option('--component', 'Make the import a component master')
   .option('--json', 'Machine-readable JSON')
-  .action((file: string, options: { name?: string; json?: boolean }) =>
-    output(importSvg(root(), file, options.name), options.json),
+  .action(
+    (
+      file: string,
+      options: {
+        name?: string;
+        page?: string;
+        x?: number;
+        y?: number;
+        component?: boolean;
+        json?: boolean;
+      },
+    ) => output(importSvg(root(), file, options.name, options), options.json),
   );
 const ref = program
   .command('ref')

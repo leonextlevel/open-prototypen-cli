@@ -14,6 +14,7 @@ All notable user-facing changes are recorded here, following [Keep a Changelog](
 - `validate canvas` warns `component-screen-undeclared` when a component, directly or through a nested instance, appears on a screen its contract does not list, and `component-unused` when a master has no linked instance. ([#11](https://github.com/leonextlevel/open-prototypen-cli/issues/11))
 - `render --page <name>` and `render --system` export whole pages, such as `Design System`, to `renders/pages/<slug>.png` on an opaque background chosen with `--background`, a canvas token, or the page background, without changing the `.fig`. ([#12](https://github.com/leonextlevel/open-prototypen-cli/issues/12))
 - `validate canvas` warns `token-sample-only` when a token is bound only to samples on the `Design System` page and no component master or screen uses it. ([#13](https://github.com/leonextlevel/open-prototypen-cli/issues/13))
+- `svg import` accepts `--page`, `--x`, `--y`, and `--component`: imports land on the chosen page, to the right of its content unless coordinates are given, so repeated imports no longer stack, and `--json` reports the page and position. ([#17](https://github.com/leonextlevel/open-prototypen-cli/issues/17))
 
 ### Changed
 

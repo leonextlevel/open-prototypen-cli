@@ -219,6 +219,54 @@ it('imports an SVG as editable vectors and preserves changed installed reference
   expect(readFileSync(review, 'utf8')).toContain('Local review note.');
 }, 60000);
 
+it('places imported SVGs on a chosen page without stacking them', async () => {
+  const root = fixture();
+  await applyDesignSystem(root);
+  evalDocument(
+    root,
+    `const page = figma.createPage(); page.name = 'Design System';`,
+    true,
+  );
+  const svg = join(root, 'icon.svg');
+  writeFileSync(
+    svg,
+    '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><path d="M4 12h16"/></svg>',
+  );
+  const page = { page: 'Design System' };
+  expect(importSvg(root, svg, 'icon-a', page)).toMatchObject({
+    page: 'Design System',
+    x: 0,
+    y: 0,
+  });
+  expect(importSvg(root, svg, 'icon-b', page)).toMatchObject({ x: 56, y: 0 });
+  expect(
+    importSvg(root, svg, 'icon-c', { ...page, x: 200, y: 120 }),
+  ).toMatchObject({ x: 200, y: 120 });
+  const master = importSvg(root, svg, 'icon-d', { ...page, component: true });
+  expect(master).toMatchObject({ type: 'COMPONENT', x: 256, y: 0 });
+  expect(
+    evalDocument(
+      root,
+      `return [...figma.graph.getAllNodes()]
+        .filter((node) => node.type === 'VECTOR' && figma.graph.getNode(node.parentId)?.name === 'icon-d')
+        .map((node) => node.strokeCap);`,
+    ),
+  ).toEqual(['ROUND']);
+  expect(
+    inspectCanvas(root)
+      .tree.filter((node) => node.name.startsWith('icon-'))
+      .map((node) => node.page),
+  ).toEqual([
+    'Design System',
+    'Design System',
+    'Design System',
+    'Design System',
+  ]);
+  expect(() => importSvg(root, svg, 'icon-e', { page: 'Missing' })).toThrow(
+    'Unknown page: Missing',
+  );
+}, 60000);
+
 it('keeps round stroke caps and joins of imported SVG icons after saving', async () => {
   const root = fixture();
   await applyDesignSystem(root);
